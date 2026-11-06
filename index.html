@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>汽配进销存管理系统</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1e3a5f">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="嘉诺汽配">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+    background: #f0f2f5;
+    color: #1f2937;
+    font-size: 14px;
+  }
+  .header {
+    background: #1e3a5f;
+    color: #fff;
+    padding: 16px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .header h1 { font-size: 20px; font-weight: 600; }
+  .header .sub { font-size: 12px; opacity: .8; margin-top: 2px; }
+  .header-actions { display: flex; gap: 8px; }
+  .btn {
+    border: none;
+    border-radius: 6px;
+    padding: 8px 14px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all .15s;
+  }
+  .btn-primary { background: #2563eb; color: #fff; }
+  .btn-primary:hover { background: #1d4ed8; }
+  .btn-success { background: #16a34a; color: #fff; }
+  .btn-success:hover { background: #15803d; }
+  .btn-outline { background: #fff; color: #374151; border: 1px solid #d1d5db; }
+  .btn-outline:hover { background: #f3f4f6; }
+  .btn-danger { background: #fee2e2; color: #dc2626; }
+  .btn-danger:hover { background: #fecaca; }
+  .btn-sm { padding: 4px 10px; font-size: 12px; }
+  .nav {
+    background: #fff;
+    border-bottom: 1px solid #e5e7eb;
+    padding: 0 24px;
+    display: flex;
+    gap: 4px;
+    overflow-x: auto;
+  }
+  .nav button {
+    border: none;
+    background: none;
+    padding: 14px 18px;
+    font-size: 14px;
+    cursor: pointer;
+    color: #6b7280;
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+    font-weight: 500;
+  }
+  .nav button.active { color: #1e3a5f; border-bottom-color: #1e3a5f; }
+  .nav button:hover { color: #1e3a5f; }
+  .container { max-width: 1200px; margin: 20px auto; padding: 0 16px; }
+  .card {
+    background: #fff;
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.06);
+    margin-bottom: 20px;
+  }
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+  .stat {
+    background: #fff;
+    border-radius: 10px;
+    padding: 18px 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.06);
+  }
+  .stat .label { font-size: 13px; color: #6b7280; }
+  .stat .value { font-size: 24px; font-weight: 700; margin-top: 6px; color: #1e3a5f; }
+  .stat .value.red { color: #dc2626; }
+  .stat .value.green { color: #16a34a; }
+  h2 { font-size: 16px; margin-bottom: 14px; color: #1e3a5f; }
+  table { width: 100%; border-collapse: collapse; }
+  th {
+    text-align: left;
+    padding: 10px 12px;
+    background: #f8fafc;
+    color: #475569;
+    font-size: 13px;
+    border-bottom: 2px solid #e2e8f0;
+    white-space: nowrap;
+  }
+  td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #f1f5f9;
+    font-size: 13px;
+  }
+  tr:hover td { background: #f8fafc; }
+  .tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 500;
+  }
+  .tag-ok { background: #dcfce7; color: #15803d; }
+  .tag-low { background: #fef3c7; color: #b45309; }
+  .tag-out { background: #fee2e2; color: #dc2626; }
+  .modal-mask {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.4);
+    z-index: 100;
+    align-items: flex-start;
+    justify-content: center;
+    overflow-y: auto;
+    padding: 40px 16px;
+  }
+  .modal-mask.show { display: flex; }
+  .modal {
+    background: #fff;
+    border-radius: 12px;
+    padding: 24px;
+    width: 100%;
+    max-width: 480px;
+    box-shadow: 0 10px 40px rgba(0,0,0,.2);
+  }
+  .modal h3 { font-size: 17px; margin-bottom: 18px; color: #1e3a5f; }
+  .form-row { margin-bottom: 14px; }
+  .form-row label { display: block; font-size: 13px; color: #4b5563; margin-bottom: 5px; }
+  .form-row input, .form-row select, .form-row textarea {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 14px;
+    font-family: inherit;
+  }
+  .form-row input:focus, .form-row select:focus, .form-row textarea:focus {
+    outline: none;
+    border-color: #2563eb;
+  }
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+  .toolbar { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; align-items: center; }
+  .toolbar input[type=text], .toolbar select {
+    padding: 8px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 13px;
+  }
+  .empty-tip { text-align: center; color: #9ca3af; padding: 30px 0; font-size: 13px; }
+  .toolbar .spacer { flex: 1; }
+  @media (max-width: 640px) {
+    .form-grid { grid-template-columns: 1fr; }
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>🚚 嘉诺汽配 · 进销存管理系统</h1>
+    <div class="sub">数据自动保存在本机浏览器中，请勿清除浏览器数据；建议定期导出备份</div>
+  </div>
+  <div class="header-actions">
+    <button class="btn btn-outline" onclick="exportData()">导出备份</button>
+    <button class="btn btn-outline" onclick="document.getElementById('importFile').click()">导入恢复</button>
+    <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(this)">
+  </div>
+</div>
+
+<div class="nav">
+  <button class="active" data-tab="dashboard" onclick="switchTab('dashboard')">📊 经营总览</button>
+  <button data-tab="inventory" onclick="switchTab('inventory')">📦 当前库存</button>
+  <button data-tab="purchase" onclick="switchTab('purchase')">📥 进货记录</button>
+  <button data-tab="sales" onclick="switchTab('sales')">📤 销售记录</button>
+  <button data-tab="parts" onclick="switchTab('parts')">🔧 配件档案</button>
+  <button data-tab="partners" onclick="switchTab('partners')">👥 供应商 / 客户</button>
+</div>
+
+<div class="container">
+  <!-- 经营总览 -->
+  <div id="tab-dashboard">
+    <div class="stats-grid" id="statsGrid"></div>
+    <div class="card">
+      <h2>💰 各配件盈利明细</h2>
+      <div style="overflow-x:auto"><table id="profitTable"></table></div>
+    </div>
+    <div class="card">
+      <h2>⚠️ 库存预警（低于 2 件）</h2>
+      <div style="overflow-x:auto"><table id="alertTable"></table></div>
+    </div>
+  </div>
+
+  <!-- 当前库存 -->
+  <div id="tab-inventory" style="display:none">
+    <div class="card">
+      <h2>📦 当前库存（进货 − 销售，自动计算）</h2>
+      <div class="toolbar">
+        <input type="text" id="invSearch" placeholder="搜索配件名称/编码..." oninput="renderInventory()">
+        <span class="spacer"></span>
+        <span style="font-size:12px;color:#9ca3af">库存成本按进货均价计算</span>
+      </div>
+      <div style="overflow-x:auto"><table id="invTable"></table></div>
+    </div>
+  </div>
+
+  <!-- 进货记录 -->
+  <div id="tab-purchase" style="display:none">
+    <div class="card">
+      <h2>📥 进货记录</h2>
+      <div class="toolbar">
+        <button class="btn btn-success" onclick="openPurchaseModal()">＋ 新增进货</button>
+        <input type="text" id="purchSearch" placeholder="搜索供应商/配件..." oninput="renderPurchases()">
+      </div>
+      <div style="overflow-x:auto"><table id="purchTable"></table></div>
+    </div>
+  </div>
+
+  <!-- 销售记录 -->
+  <div id="tab-sales" style="display:none">
+    <div class="card">
+      <h2>📤 销售记录</h2>
+      <div class="toolbar">
+        <button class="btn btn-primary" onclick="openSalesModal()">＋ 新增销售</button>
+        <button class="btn btn-outline" onclick="openCustomerModal()">＋ 新增客户</button>
+        <select id="salesCustomerFilter" onchange="renderSales()">
+          <option value="">全部客户</option>
+        </select>
+        <input type="text" id="salesSearch" placeholder="搜索客户/配件..." oninput="renderSales()">
+      </div>
+      <div style="overflow-x:auto"><table id="salesTable"></table></div>
+    </div>
+    <div class="card">
+      <h2>👥 客户目录（购买汇总）</h2>
+      <div class="toolbar">
+        <input type="text" id="custDirSearch" placeholder="搜索客户名称/电话..." oninput="renderCustomerDir()">
+      </div>
+      <div style="overflow-x:auto"><table id="custDirTable"></table></div>
+    </div>
+  </div>
+
+  <!-- 配件档案 -->
+  <div id="tab-parts" style="display:none">
+    <div class="card">
+      <h2>🔧 配件档案</h2>
+      <div class="toolbar">
+        <button class="btn btn-primary" onclick="openPartModal()">＋ 新增配件</button>
+        <input type="text" id="partSearch" placeholder="搜索配件名称/编码..." oninput="renderParts()">
+      </div>
+      <div style="overflow-x:auto"><table id="partsTable"></table></div>
+    </div>
+  </div>
+
+  <!-- 供应商 / 客户 -->
+  <div id="tab-partners" style="display:none">
+    <div class="card">
+      <h2>🏭 供应商（进货商家）</h2>
+      <div class="toolbar"><button class="btn btn-success" onclick="openSupplierModal()">＋ 新增供应商</button></div>
+      <div style="overflow-x:auto"><table id="suppliersTable"></table></div>
+    </div>
+    <div class="card">
+      <h2>🤝 客户</h2>
+      <div class="toolbar"><button class="btn btn-primary" onclick="openCustomerModal()">＋ 新增客户</button></div>
+      <div style="overflow-x:auto"><table id="customersTable"></table></div>
+    </div>
+  </div>
+</div>
+
+<!-- 通用弹窗 -->
+<div class="modal-mask" id="modalMask">
+  <div class="modal">
+    <h3 id="modalTitle"></h3>
+    <div id="modalBody"></div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal()">取消</button>
+      <button class="btn btn-primary" id="modalSave">保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============ 数据存储 ============
+const STORE_KEY = "autoPartsStore_v1";
+let db = load();
+
+function load() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {}
+  return { parts: [], suppliers: [], customers: [], purchases: [], sales: [], seq: 1 };
+}
+function save() { localStorage.setItem(STORE_KEY, JSON.stringify(db)); }
+function nextId() { return db.seq++; }
+function today() { return new Date().toISOString().slice(0, 10); }
+function fmtMoney(n) { return "¥" + Number(n || 0).toFixed(2); }
+function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function partName(id) { const p = db.parts.find(x => x.id === id); return p ? (p.name + (p.spec ? "（" + p.spec + "）" : "")) : "未知配件"; }
+function partnerName(list, id) { const p = list.find(x => x.id === id); return p ? p.name : "未知"; }
+
+// ============ 库存自动计算 ============
+function stockOf(partId) {
+  const inQty = db.purchases.filter(p => p.partId === partId).reduce((s, p) => s + Number(p.qty), 0);
+  const outQty = db.sales.filter(s => s.partId === partId).reduce((s, x) => s + Number(x.qty), 0);
+  return { inQty, outQty, stock: inQty - outQty };
+}
+function avgCostOf(partId) {
+  const ps = db.purchases.filter(p => p.partId === partId);
+  const totalQty = ps.reduce((s, p) => s + Number(p.qty), 0);
+  if (!totalQty) return 0;
+  return ps.reduce((s, p) => s + Number(p.qty) * Number(p.price), 0) / totalQty;
+}
+function allStockRows() {
+  return db.parts.map(p => {
+    const st = stockOf(p.id);
+    const cost = avgCostOf(p.id);
+    const sold = db.sales.filter(s => s.partId === p.id);
+    const revenue = sold.reduce((s, x) => s + Number(x.qty) * Number(x.price), 0);
+    const soldQty = st.outQty;
+    const profit = soldQty * (soldQty ? (revenue / soldQty - cost) : 0);
+    return { part: p, ...st, cost, revenue, profit, stockValue: st.stock * cost };
+  });
+}
+
+// ============ 标签页切换 ============
+function switchTab(tab) {
+  document.querySelectorAll(".nav button").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
+  ["dashboard","inventory","purchase","sales","parts","partners"].forEach(t => {
+    document.getElementById("tab-" + t).style.display = (t === tab) ? "" : "none";
+  });
+  renderAll();
+}
+
+// ============ 渲染 ============
+function renderAll() {
+  renderDashboard();
+  renderInventory();
+  renderPurchases();
+  renderSales();
+  renderCustomerDir();
+  renderParts();
+  renderPartners();
+}
+
+function renderDashboard() {
+  const rows = allStockRows();
+  const totalStockValue = rows.reduce((s, r) => s + r.stockValue, 0);
+  const totalRevenue = db.sales.reduce((s, x) => s + Number(x.qty) * Number(x.price), 0);
+  const totalCostSold = db.sales.reduce((s, x) => s + Number(x.qty) * avgCostOf(x.partId), 0);
+  const totalProfit = totalRevenue - totalCostSold;
+  const totalPurchase = db.purchases.reduce((s, x) => s + Number(x.qty) * Number(x.price), 0);
+  const lowStock = rows.filter(r => r.stock < 2);
+  document.getElementById("statsGrid").innerHTML = [
+    ["当前库存总价值", fmtMoney(totalStockValue), ""],
+    ["累计进货金额", fmtMoney(totalPurchase), ""],
+    ["累计销售金额", fmtMoney(totalRevenue), "green"],
+    ["累计毛利润", fmtMoney(totalProfit), totalProfit >= 0 ? "green" : "red"],
+    ["配件种类", db.parts.length + " 种", ""],
+    ["库存预警", lowStock.length + " 项", lowStock.length ? "red" : ""]
+  ].map(([l, v, c]) => `<div class="stat"><div class="label">${l}</div><div class="value ${c}">${v}</div></div>`).join("");
+
+  document.getElementById("profitTable").innerHTML = rows.length ? `
+    <tr><th>配件</th><th>累计进货</th><th>累计销售</th><th>当前库存</th><th>进货均价</th><th>销售金额</th><th>毛利润</th></tr>
+    ${rows.map(r => `<tr>
+      <td><b>${esc(r.part.name)}</b>${r.part.spec ? " " + esc(r.part.spec) : ""}</td>
+      <td>${r.inQty} 件</td><td>${r.outQty} 件</td><td>${r.stock} 件</td>
+      <td>${fmtMoney(r.cost)}</td><td>${fmtMoney(r.revenue)}</td>
+      <td style="color:${r.profit >= 0 ? "#16a34a" : "#dc2626"};font-weight:600">${fmtMoney(r.profit)}</td>
+    </tr>`).join("")}` : `<div class="empty-tip">暂无数据，请先在「配件档案」中添加配件</div>`;
+
+  document.getElementById("alertTable").innerHTML = lowStock.length ? `
+    <tr><th>配件</th><th>当前库存</th><th>状态</th></tr>
+    ${lowStock.map(r => `<tr>
+      <td><b>${esc(r.part.name)}</b></td><td>${r.stock} 件</td>
+      <td>${r.stock <= 0 ? '<span class="tag tag-out">已售完</span>' : '<span class="tag tag-low">库存偏低</span>'}</td>
+    </tr>`).join("")}` : `<div class="empty-tip">👍 暂无库存预警</div>`;
+}
+
+function renderInventory() {
+  const kw = (document.getElementById("invSearch").value || "").toLowerCase();
+  let rows = allStockRows();
+  if (kw) rows = rows.filter(r => (r.part.name + (r.part.code || "") + (r.part.spec || "")).toLowerCase().includes(kw));
+  document.getElementById("invTable").innerHTML = rows.length ? `
+    <tr><th>配件编码</th><th>配件名称</th><th>规格/适配车型</th><th>累计进货</th><th>累计销售</th><th>当前库存</th><th>进货均价</th><th>库存价值</th><th>状态</th></tr>
+    ${rows.map(r => {
+      const status = r.stock <= 0 ? '<span class="tag tag-out">无货</span>' : r.stock < 2 ? '<span class="tag tag-low">偏低</span>' : '<span class="tag tag-ok">正常</span>';
+      return `<tr><td>${esc(r.part.code || "-")}</td><td><b>${esc(r.part.name)}</b></td><td>${esc(r.part.spec || "-")}</td>
+        <td>${r.inQty} 件</td><td>${r.outQty} 件</td><td><b>${r.stock} 件</b></td>
+        <td>${fmtMoney(r.cost)}</td><td>${fmtMoney(r.stockValue)}</td><td>${status}</td></tr>`;
+    }).join("")}` : `<div class="empty-tip">暂无配件，请先添加配件档案</div>`;
+}
+
+function renderPurchases() {
+  const kw = (document.getElementById("purchSearch").value || "").toLowerCase();
+  let list = [...db.purchases].sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id);
+  if (kw) list = list.filter(p => (partnerName(db.suppliers, p.supplierId) + partName(p.partId)).toLowerCase().includes(kw));
+  document.getElementById("purchTable").innerHTML = list.length ? `
+    <tr><th>日期</th><th>供应商</th><th>配件</th><th>数量</th><th>单价</th><th>金额</th><th>备注</th><th>操作</th></tr>
+    ${list.map(p => `<tr>
+      <td>${esc(p.date)}</td><td>${esc(partnerName(db.suppliers, p.supplierId))}</td><td>${esc(partName(p.partId))}</td>
+      <td>${p.qty}</td><td>${fmtMoney(p.price)}</td><td><b>${fmtMoney(p.qty * p.price)}</b></td>
+      <td>${esc(p.note || "-")}</td>
+      <td><button class="btn btn-danger btn-sm" onclick="delRecord('purchases', ${p.id})">删除</button></td>
+    </tr>`).join("")}
+    <tr style="font-weight:700;background:#f8fafc"><td colspan="5">合计</td><td>${fmtMoney(list.reduce((s, p) => s + p.qty * p.price, 0))}</td><td colspan="2"></td></tr>`
+    : `<div class="empty-tip">暂无进货记录</div>`;
+}
+
+function renderSales() {
+  // 刷新客户筛选下拉框（保留当前选择）
+  const filterSel = document.getElementById("salesCustomerFilter");
+  const curFilter = filterSel.value;
+  filterSel.innerHTML = '<option value="">全部客户</option>' + selOptions(db.customers, null);
+  if ([...filterSel.options].some(o => o.value === curFilter)) filterSel.value = curFilter;
+  const custFilter = filterSel.value ? Number(filterSel.value) : null;
+  const kw = (document.getElementById("salesSearch").value || "").toLowerCase();
+  let list = [...db.sales].sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id);
+  if (custFilter) list = list.filter(s => s.customerId === custFilter);
+  if (kw) list = list.filter(s => (partnerName(db.customers, s.customerId) + partName(s.partId)).toLowerCase().includes(kw));
+  document.getElementById("salesTable").innerHTML = list.length ? `
+    <tr><th>日期</th><th>客户</th><th>配件</th><th>数量</th><th>单价</th><th>金额</th><th>毛利</th><th>备注</th><th>操作</th></tr>
+    ${list.map(s => {
+      const profit = s.qty * (Number(s.price) - avgCostOf(s.partId));
+      return `<tr><td>${esc(s.date)}</td><td>${esc(partnerName(db.customers, s.customerId))}</td><td>${esc(partName(s.partId))}</td>
+        <td>${s.qty}</td><td>${fmtMoney(s.price)}</td><td><b>${fmtMoney(s.qty * s.price)}</b></td>
+        <td style="color:${profit >= 0 ? "#16a34a" : "#dc2626"}">${fmtMoney(profit)}</td>
+        <td>${esc(s.note || "-")}</td>
+        <td><button class="btn btn-danger btn-sm" onclick="delRecord('sales', ${s.id})">删除</button></td></tr>`;
+    }).join("")}
+    <tr style="font-weight:700;background:#f8fafc"><td colspan="5">合计</td><td>${fmtMoney(list.reduce((s, x) => s + x.qty * x.price, 0))}</td><td colspan="3"></td></tr>`
+    : `<div class="empty-tip">暂无销售记录</div>`;
+}
+
+function renderCustomerDir() {
+  const kw = (document.getElementById("custDirSearch").value || "").toLowerCase();
+  let list = db.customers;
+  if (kw) list = list.filter(c => (c.name + (c.phone || "")).toLowerCase().includes(kw));
+  document.getElementById("custDirTable").innerHTML = list.length ? `
+    <tr><th>客户名称</th><th>电话</th><th>购买笔数</th><th>总数量</th><th>累计金额</th><th>最近购买</th><th>操作</th></tr>
+    ${list.map(c => {
+      const recs = db.sales.filter(s => s.customerId === c.id).sort((a, b) => b.date.localeCompare(a.date));
+      const totalQty = recs.reduce((s, x) => s + Number(x.qty), 0);
+      const totalAmt = recs.reduce((s, x) => s + Number(x.qty) * Number(x.price), 0);
+      return `<tr><td><b>${esc(c.name)}</b></td><td>${esc(c.phone || "-")}</td><td>${recs.length} 笔</td>
+        <td>${totalQty} 件</td><td><b>${fmtMoney(totalAmt)}</b></td><td>${recs.length ? esc(recs[0].date) : "-"}</td>
+        <td>
+          <button class="btn btn-outline btn-sm" onclick="filterByCustomer(${c.id})">看明细</button>
+          <button class="btn btn-outline btn-sm" onclick="openCustomerModal(${c.id})">编辑</button>
+        </td></tr>`;
+    }).join("")}` : `<div class="empty-tip">暂无客户，点击「新增客户」添加</div>`;
+}
+
+function filterByCustomer(id) {
+  document.getElementById("salesCustomerFilter").value = String(id);
+  renderSales();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function renderParts() {
+  const kw = (document.getElementById("partSearch").value || "").toLowerCase();
+  let list = db.parts;
+  if (kw) list = list.filter(p => (p.name + (p.code || "") + (p.spec || "")).toLowerCase().includes(kw));
+  document.getElementById("partsTable").innerHTML = list.length ? `
+    <tr><th>编码</th><th>名称</th><th>规格/适配车型</th><th>单位</th><th>当前库存</th><th>备注</th><th>操作</th></tr>
+    ${list.map(p => {
+      const st = stockOf(p.id);
+      return `<tr><td>${esc(p.code || "-")}</td><td><b>${esc(p.name)}</b></td><td>${esc(p.spec || "-")}</td>
+        <td>${esc(p.unit || "件")}</td><td>${st.stock} 件</td><td>${esc(p.note || "-")}</td>
+        <td>
+          <button class="btn btn-outline btn-sm" onclick="openPartModal(${p.id})">编辑</button>
+          <button class="btn btn-danger btn-sm" onclick="delPart(${p.id})">删除</button>
+        </td></tr>`;
+    }).join("")}` : `<div class="empty-tip">暂无配件，点击上方「新增配件」开始使用</div>`;
+}
+
+function renderPartners() {
+  const supCount = id => db.purchases.filter(p => p.supplierId === id).length;
+  const cusCount = id => db.sales.filter(s => s.customerId === id).length;
+  document.getElementById("suppliersTable").innerHTML = db.suppliers.length ? `
+    <tr><th>名称</th><th>电话</th><th>进货笔数</th><th>备注</th><th>操作</th></tr>
+    ${db.suppliers.map(s => `<tr><td><b>${esc(s.name)}</b></td><td>${esc(s.phone || "-")}</td><td>${supCount(s.id)} 笔</td>
+      <td>${esc(s.note || "-")}</td>
+      <td><button class="btn btn-outline btn-sm" onclick="openSupplierModal(${s.id})">编辑</button>
+      <button class="btn btn-danger btn-sm" onclick="delPartner('suppliers', ${s.id})">删除</button></td></tr>`).join("")}`
+    : `<div class="empty-tip">暂无供应商</div>`;
+  document.getElementById("customersTable").innerHTML = db.customers.length ? `
+    <tr><th>名称</th><th>电话</th><th>购买笔数</th><th>备注</th><th>操作</th></tr>
+    ${db.customers.map(c => `<tr><td><b>${esc(c.name)}</b></td><td>${esc(c.phone || "-")}</td><td>${cusCount(c.id)} 笔</td>
+      <td>${esc(c.note || "-")}</td>
+      <td><button class="btn btn-outline btn-sm" onclick="openCustomerModal(${c.id})">编辑</button>
+      <button class="btn btn-danger btn-sm" onclick="delPartner('customers', ${c.id})">删除</button></td></tr>`).join("")}`
+    : `<div class="empty-tip">暂无客户</div>`;
+}
+
+// ============ 删除 ============
+function delRecord(key, id) {
+  if (!confirm("确定删除这条记录吗？库存会相应调整。")) return;
+  db[key] = db[key].filter(x => x.id !== id);
+  save(); renderAll();
+}
+function delPartner(key, id) {
+  const used = key === "suppliers" ? db.purchases.some(p => p.supplierId === id) : db.sales.some(s => s.customerId === id);
+  if (used) { alert("该对象已有业务记录，不能删除；如需停用可修改备注。"); return; }
+  if (!confirm("确定删除吗？")) return;
+  db[key] = db[key].filter(x => x.id !== id);
+  save(); renderAll();
+}
+function delPart(id) {
+  const used = db.purchases.some(p => p.partId === id) || db.sales.some(s => s.partId === id);
+  if (used) { alert("该配件已有进货/销售记录，不能删除。"); return; }
+  if (!confirm("确定删除该配件吗？")) return;
+  db.parts = db.parts.filter(p => p.id !== id);
+  save(); renderAll();
+}
+
+// ============ 弹窗 ============
+let modalHandler = null;
+function showModal(title, bodyHtml, onSave) {
+  document.getElementById("modalTitle").textContent = title;
+  document.getElementById("modalBody").innerHTML = bodyHtml;
+  document.getElementById("modalMask").classList.add("show");
+  modalHandler = onSave;
+  document.getElementById("modalSave").onclick = () => { if (modalHandler()) { closeModal(); } };
+}
+function closeModal() { document.getElementById("modalMask").classList.remove("show"); }
+document.getElementById("modalMask").addEventListener("click", e => { if (e.target === e.currentTarget) closeModal(); });
+
+function selOptions(list, selected) {
+  return list.map(x => `<option value="${x.id}" ${x.id === selected ? "selected" : ""}>${esc(x.name)}</option>`).join("");
+}
+function val(id) { return document.getElementById(id).value.trim(); }
+
+// 配件
+function openPartModal(id) {
+  const p = db.parts.find(x => x.id === id) || {};
+  showModal(id ? "编辑配件" : "新增配件", `
+    <div class="form-row"><label>配件名称 *</label><input id="f-name" value="${esc(p.name || "")}" placeholder="如：机油滤芯"></div>
+    <div class="form-grid">
+      <div class="form-row"><label>配件编码</label><input id="f-code" value="${esc(p.code || "")}" placeholder="如：OF-001"></div>
+      <div class="form-row"><label>单位</label><input id="f-unit" value="${esc(p.unit || "件")}"></div>
+    </div>
+    <div class="form-row"><label>规格 / 适配车型</label><input id="f-spec" value="${esc(p.spec || "")}" placeholder="如：大众朗逸 1.6L 适配"></div>
+    <div class="form-row"><label>备注</label><input id="f-note" value="${esc(p.note || "")}"></div>
+  `, () => {
+    const name = val("f-name");
+    if (!name) { alert("请填写配件名称"); return false; }
+    if (id) {
+      Object.assign(p, { name, code: val("f-code"), unit: val("f-unit") || "件", spec: val("f-spec"), note: val("f-note") });
+    } else {
+      db.parts.push({ id: nextId(), name, code: val("f-code"), unit: val("f-unit") || "件", spec: val("f-spec"), note: val("f-note") });
+    }
+    save(); renderAll(); return true;
+  });
+}
+
+// 供应商
+function openSupplierModal(id) {
+  const s = db.suppliers.find(x => x.id === id) || {};
+  showModal(id ? "编辑供应商" : "新增供应商", `
+    <div class="form-row"><label>名称 / 商家名 *</label><input id="f-name" value="${esc(s.name || "")}"></div>
+    <div class="form-row"><label>联系电话</label><input id="f-phone" value="${esc(s.phone || "")}"></div>
+    <div class="form-row"><label>备注（如主营品类、地址）</label><input id="f-note" value="${esc(s.note || "")}"></div>
+  `, () => {
+    const name = val("f-name");
+    if (!name) { alert("请填写名称"); return false; }
+    if (id) Object.assign(s, { name, phone: val("f-phone"), note: val("f-note") });
+    else db.suppliers.push({ id: nextId(), name, phone: val("f-phone"), note: val("f-note") });
+    save(); renderAll(); return true;
+  });
+}
+
+// 客户
+function openCustomerModal(id) {
+  const c = db.customers.find(x => x.id === id) || {};
+  showModal(id ? "编辑客户" : "新增客户", `
+    <div class="form-row"><label>客户名称 *</label><input id="f-name" value="${esc(c.name || "")}"></div>
+    <div class="form-row"><label>联系电话</label><input id="f-phone" value="${esc(c.phone || "")}"></div>
+    <div class="form-row"><label>备注</label><input id="f-note" value="${esc(c.note || "")}"></div>
+  `, () => {
+    const name = val("f-name");
+    if (!name) { alert("请填写客户名称"); return false; }
+    if (id) Object.assign(c, { name, phone: val("f-phone"), note: val("f-note") });
+    else db.customers.push({ id: nextId(), name, phone: val("f-phone"), note: val("f-note") });
+    save(); renderAll(); return true;
+  });
+}
+
+// 进货
+function openPurchaseModal() {
+  if (!db.parts.length) { alert("请先在「配件档案」中添加配件"); return; }
+  if (!db.suppliers.length) { alert("请先在「供应商 / 客户」中添加进货商家"); return; }
+  showModal("新增进货", `
+    <div class="form-row"><label>进货日期 *</label><input type="date" id="f-date" value="${today()}"></div>
+    <div class="form-row"><label>进货商家 *</label><select id="f-supplier">${selOptions(db.suppliers)}</select></div>
+    <div class="form-row"><label>配件 *</label><select id="f-part">${selOptions(db.parts)}</select></div>
+    <div class="form-grid">
+      <div class="form-row"><label>数量 *</label><input type="number" id="f-qty" min="0.01" step="0.01" placeholder="如：10"></div>
+      <div class="form-row"><label>进货单价（¥）*</label><input type="number" id="f-price" min="0" step="0.01" placeholder="如：45.50"></div>
+    </div>
+    <div class="form-row"><label>备注</label><input id="f-note" placeholder="如：运费、批次等"></div>
+  `, () => {
+    const qty = Number(val("f-qty")), price = Number(val("f-price"));
+    if (!val("f-date")) { alert("请选择日期"); return false; }
+    if (!(qty > 0)) { alert("请填写正确的数量"); return false; }
+    if (!(price >= 0) || val("f-price") === "") { alert("请填写正确的单价"); return false; }
+    db.purchases.push({ id: nextId(), date: val("f-date"), supplierId: Number(val("f-supplier")), partId: Number(val("f-part")), qty, price, note: val("f-note") });
+    save(); renderAll(); return true;
+  });
+}
+
+// 录销售时快速新增客户（不关闭当前弹窗）
+function quickAddCustomer() {
+  const name = prompt("请输入新客户名称：");
+  if (!name || !name.trim()) return;
+  const phone = prompt("客户电话（可留空，直接点取消）：") || "";
+  const c = { id: nextId(), name: name.trim(), phone: phone.trim(), note: "" };
+  db.customers.push(c);
+  save();
+  // 刷新当前弹窗中的客户下拉框，并选中新客户（不影响已填写的其他字段）
+  const sel = document.getElementById("f-customer");
+  if (sel) {
+    sel.innerHTML = selOptions(db.customers);
+    sel.value = String(c.id);
+  }
+  renderAll();
+}
+
+// 销售
+function openSalesModal() {
+  if (!db.parts.length) { alert("请先在「配件档案」中添加配件"); return; }
+  if (!db.customers.length) { alert("请先在「供应商 / 客户」中添加客户"); return; }
+  const options = db.parts.map(p => {
+    const st = stockOf(p.id);
+    return `<option value="${p.id}">${esc(p.name)}${p.spec ? "（" + esc(p.spec) + "）" : ""} — 库存 ${st.stock}</option>`;
+  }).join("");
+  showModal("新增销售", `
+    <div class="form-row"><label>销售日期 *</label><input type="date" id="f-date" value="${today()}"></div>
+    <div class="form-row"><label>客户 *</label>
+      <div style="display:flex;gap:8px">
+        <select id="f-customer" style="flex:1">${selOptions(db.customers)}</select>
+        <button type="button" class="btn btn-success" onclick="quickAddCustomer()">＋ 新客户</button>
+      </div>
+    </div>
+    <div class="form-row"><label>配件 *</label><select id="f-part">${options}</select></div>
+    <div class="form-grid">
+      <div class="form-row"><label>数量 *</label><input type="number" id="f-qty" min="0.01" step="0.01" placeholder="如：2"></div>
+      <div class="form-row"><label>出售单价（¥）*</label><input type="number" id="f-price" min="0" step="0.01" placeholder="如：68.00"></div>
+    </div>
+    <div class="form-row"><label>备注</label><input id="f-note"></div>
+  `, () => {
+    const qty = Number(val("f-qty")), price = Number(val("f-price"));
+    if (!val("f-date")) { alert("请选择日期"); return false; }
+    if (!(qty > 0)) { alert("请填写正确的数量"); return false; }
+    if (!(price >= 0) || val("f-price") === "") { alert("请填写正确的单价"); return false; }
+    db.sales.push({ id: nextId(), date: val("f-date"), customerId: Number(val("f-customer")), partId: Number(val("f-part")), qty, price, note: val("f-note") });
+    save(); renderAll(); return true;
+  });
+}
+
+// ============ 导入导出 ============
+function exportData() {
+  const blob = new Blob([JSON.stringify(db, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "汽配库存备份_" + today() + ".json";
+  a.click();
+}
+function importData(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (!confirm("导入会覆盖当前所有数据，确定继续吗？")) { input.value = ""; return; }
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result);
+      if (!data.parts || !data.purchases || !data.sales) throw new Error("格式不对");
+      db = data; save(); renderAll();
+      alert("导入成功！");
+    } catch (e) { alert("导入失败：文件格式不正确"); }
+    input.value = "";
+  };
+  reader.readAsText(file);
+}
+
+// ============ 启动 ============
+renderAll();
+
+// PWA：注册离线缓存（仅在 https/localhost 下生效，本地文件打开时自动跳过）
+if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
+  navigator.serviceWorker.register("./sw.js").catch(() => {});
+}
+</script>
+</body>
+</html>
