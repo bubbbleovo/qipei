@@ -1,0 +1,15 @@
+{
+  "name": "嘉诺汽配 · 进销存管理系统",
+  "short_name": "嘉诺汽配",
+  "description": "嘉诺汽配进销存：库存、进货、销售、客户记录与自动利润统计",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f0f2f5",
+  "theme_color": "#1e3a5f",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
