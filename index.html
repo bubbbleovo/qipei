@@ -90,6 +90,21 @@
   .mini-link:active { opacity: .55; }
   .bar-wrap { background: #eef2f7; border-radius: 4px; height: 8px; width: 90px; overflow: hidden; }
   .bar { height: 100%; background: linear-gradient(90deg,#3b82f6,#1e3a5f); border-radius: 4px; }
+  /* ===== 多商品开单（勾选） ===== */
+  .pick-tools { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
+  .pick-tools input { flex: 1; min-width: 110px; padding: 7px 9px; border: 1px solid #d1d5db; border-radius: 7px; font-size: 13px; font-family: inherit; }
+  .pick-list { border: 1px solid #e5e7eb; border-radius: 8px; max-height: 300px; overflow: auto; -webkit-overflow-scrolling: touch; }
+  .pick-head, .pick-row { display: grid; grid-template-columns: 28px 1fr 64px 78px; gap: 6px; align-items: center; padding: 7px 9px; font-size: 12px; }
+  .pick-head { position: sticky; top: 0; background: #f8fafc; color: #475569; font-weight: 600; border-bottom: 1px solid #e2e8f0; z-index: 1; }
+  .pick-head span:nth-child(3), .pick-head span:nth-child(4) { text-align: right; }
+  .pick-row { border-bottom: 1px solid #f1f5f9; }
+  .pick-row:last-child { border-bottom: none; }
+  .pick-row.on { background: #f0fdf4; }
+  .pick-row input[type=checkbox] { width: 17px; height: 17px; accent-color: #16a34a; }
+  .pick-row .nm { font-size: 13px; font-weight: 600; color: #1e3a5f; line-height: 1.35; word-break: break-all; }
+  .pick-row .nm .sm { display: block; font-weight: 400; font-size: 11px; color: #9ca3af; margin-top: 1px; }
+  .pick-row input[type=number] { width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; font-family: inherit; text-align: right; }
+  .order-tag { display: inline-block; background: #e0e7ff; color: #3730a3; border-radius: 6px; padding: 0 5px; font-size: 10px; font-weight: 700; margin-left: 4px; }
   /* ===== 打印 / 送货单 ===== */
   .print-overlay { display: none; position: fixed; inset: 0; background: #f0f2f5; overflow: auto; z-index: 300; }
   .print-overlay.show { display: block; }
@@ -133,7 +148,7 @@
 <div class="header">
   <div>
     <h1>🚚 嘉诺汽配 · 进销货记录</h1>
-    <div class="sub">一条记一批进货：进价、数量、商家；卖多少记多少，库存自动算｜数据存本机，建议定期导出备份<span id="verTag" style="opacity:.55"> · v9</span></div>
+    <div class="sub">一条记一批进货：进价、数量、商家；卖多少记多少，库存自动算｜数据存本机，建议定期导出备份<span id="verTag" style="opacity:.55"> · v10</span></div>
   </div>
   <div class="header-actions">
     <button class="btn btn-outline" id="fsBtn" onclick="toggleFullscreen()" style="display:none">⛶ 全屏</button>
@@ -156,6 +171,7 @@
     <div class="card">
       <div class="toolbar">
         <button class="btn btn-primary" onclick="openRecordModal()">＋ 记一笔进货</button>
+        <button class="btn btn-success" onclick="openBulkSellModal()">🧾 多商品开单</button>
         <select id="fProduct" onchange="renderRecords()"><option value="">全部商品</option></select>
         <select id="fCustomer" onchange="renderRecords()"><option value="">全部客户</option></select>
         <input type="date" id="fFrom" onchange="renderRecords()" title="进货日期起">
@@ -174,6 +190,7 @@
       <h2>📦 当前库存（按商品汇总）</h2>
       <div class="hint" style="margin-bottom:10px">库存 = 进货总数 − 已卖出总数。每批货可以分多次卖，卖多少扣多少。</div>
       <div class="toolbar">
+        <button class="btn btn-success btn-sm" onclick="openBulkSellModal()">🧾 多商品开单</button>
         <select id="stockProduct" onchange="renderStock()"><option value="">全部商品</option></select>
         <input type="text" id="stockSearch" placeholder="搜商品名称" oninput="renderStock()" style="flex:1;min-width:130px">
         <label class="chk-label">
@@ -260,15 +277,16 @@
 /* ================= 数据层 =================
    模型：一条记录 = 一批进货
    { id, date(进货日期), product, qty(进货数量), cost(进货单价), supplier, note,
-     sales: [{ id, date, qty, price, customer }] }
+     sales: [{ id, date, qty, price, customer, paid, order }] }
    库存 = qty - Σsales.qty
+   order：多商品开单时同一张单的多笔卖出共用一个单号（空 = 单商品卖出）
 */
 const KEY = "jnqipei_v3";
 const V2_KEY = "jnqipei_v2";
 const OLD_KEY = "autoPartsStore_v1";
 let db = load();
 
-function blankDB() { return { records: [], customers: [], seq: 1 }; }
+function blankDB() { return { records: [], customers: [], seq: 1, orderSeq: 1 }; }
 
 function maxSeq(d) {
   let m = 0;
@@ -278,6 +296,15 @@ function maxSeq(d) {
   });
   (d.customers || []).forEach(c => { m = Math.max(m, Number(c.id) || 0); });
   return m + 1;
+}
+
+function maxOrderSeq(d) {
+  let m = 0;
+  (d.records || []).forEach(r => (r.sales || []).forEach(s => {
+    const mt = /-(\d+)$/.exec(String(s.order || ""));
+    if (mt) m = Math.max(m, Number(mt[1]) || 0);
+  }));
+  return m;
 }
 
 function normalize(d) {
@@ -291,11 +318,12 @@ function normalize(d) {
       // paid = 实收金额。旧数据没有这个字段，视为已收全款
       const paid = (s.paid === undefined || s.paid === null || s.paid === "")
         ? total : Math.max(0, Math.min(Number(s.paid) || 0, total));
-      return { id: s.id, date: s.date || r.date || "", qty: q, price: p, customer: s.customer || "", paid: paid };
+      return { id: s.id, date: s.date || r.date || "", qty: q, price: p, customer: s.customer || "", paid: paid, order: s.order || "" };
     })
   }));
   out.customers = (d.customers || []).map(c => ({ id: c.id, name: c.name, phone: c.phone || "", note: c.note || "" }));
   out.seq = Math.max(Number(d.seq) || 1, maxSeq(out));
+  out.orderSeq = Math.max(Number(d.orderSeq) || 1, maxOrderSeq(out) + 1);
   return out;
 }
 
@@ -390,6 +418,47 @@ function soldQtyOf(r) { return (r.sales || []).reduce((s, x) => s + (Number(x.qt
 function stockOf(r) { return (Number(r.qty) || 0) - soldQtyOf(r); }
 function soldAmtOf(r) { return (r.sales || []).reduce((s, x) => s + (Number(x.qty) || 0) * (Number(x.price) || 0), 0); }
 function profitOf(r) { return soldAmtOf(r) - soldQtyOf(r) * (Number(r.cost) || 0); }
+
+/* ---- 多商品开单 ---- */
+// 单号：JN + 日期 + 3 位流水，例如 JN20261108-003
+function nextOrderNo(date) {
+  const d = String(date || today()).replace(/-/g, "");
+  const n = Math.max(1, Number(db.orderSeq) || 1);
+  db.orderSeq = n + 1;
+  return "JN" + d + "-" + String(n).padStart(3, "0");
+}
+// 某商品还有货的批次，按进货日期从早到晚（先进先出）
+function stockBatchesOf(product) {
+  return db.records
+    .filter(r => r.product === product && stockOf(r) > 1e-9)
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)) || a.id - b.id);
+}
+// 该商品最近一次的卖价，开单时当默认价
+function lastPriceOf(product) {
+  let best = null;
+  db.records.forEach(r => {
+    if (r.product !== product) return;
+    (r.sales || []).forEach(s => { if (!best || String(s.date) >= String(best.date)) best = s; });
+  });
+  return best ? (Number(best.price) || 0) : 0;
+}
+// 一张单里的所有卖出明细
+function orderSales(orderNo) {
+  const out = [];
+  if (!orderNo) return out;
+  db.records.forEach(r => (r.sales || []).forEach(s => { if (s.order === orderNo) out.push({ r: r, s: s }); }));
+  return out;
+}
+// 同一张单里同商品同价的合并成一行（跨批次时打印更好看）
+function orderLines(orderNo) {
+  const map = {};
+  orderSales(orderNo).forEach(x => {
+    const key = x.r.product + "\u0001" + (Number(x.s.price) || 0) + "\u0001" + (x.r.note || "");
+    if (!map[key]) map[key] = { product: x.r.product, note: x.r.note || "", price: Number(x.s.price) || 0, qty: 0 };
+    map[key].qty += Number(x.s.qty) || 0;
+  });
+  return Object.values(map);
+}
 
 /* ---- 收款 / 欠款 ---- */
 function saleTotal(s) { return (Number(s.qty) || 0) * (Number(s.price) || 0); }
@@ -539,7 +608,10 @@ function salesCell(r) {
   return list.slice().sort((a, b) => String(a.date).localeCompare(String(b.date))).map(s => {
     const d = saleDebt(s);
     const tag = d > 0.005 ? `<span class="debt-tag">欠 ${money(d)}</span>` : "";
-    return `<div class="sale-line">${esc(s.customer || "未填客户")} <b>${qtyText(s.qty)}</b>件 × ${money(s.price)} <span class="muted">${esc(s.date || "")}</span>${tag}<a class="mini-link" onclick="printSlip(${r.id},${s.id})">送货单</a></div>`;
+    const link = s.order
+      ? `<a class="mini-link" data-order="${esc(s.order)}" onclick="printOrderSlip(this.dataset.order)">整单</a><span class="order-tag">${esc(String(s.order).slice(-3))}</span>`
+      : `<a class="mini-link" onclick="printSlip(${r.id},${s.id})">送货单</a>`;
+    return `<div class="sale-line">${esc(s.customer || "未填客户")} <b>${qtyText(s.qty)}</b>件 × ${money(s.price)} <span class="muted">${esc(s.date || "")}</span>${tag}${link}</div>`;
   }).join("");
 }
 
@@ -931,7 +1003,9 @@ function openSellModal(id) {
           <td class="num">${d > 0.005 ? money(salePaid(s)) : `<span class="paid-num">${money(salePaid(s))}</span>`}</td>
           <td class="num">${d > 0.005 ? `<span class="debt-num">${money(d)}</span>` : '<span class="muted">0</span>'}</td>
           <td><div class="row-actions">
-            <button class="btn btn-outline btn-sm" onclick="printSlip(${r.id},${s.id})">单</button>
+            ${s.order
+              ? `<button class="btn btn-outline btn-sm" data-order="${esc(s.order)}" onclick="printOrderSlip(this.dataset.order)">整单</button>`
+              : `<button class="btn btn-outline btn-sm" onclick="printSlip(${r.id},${s.id})">单</button>`}
             <button class="btn btn-danger btn-sm" onclick="delSale(${r.id},${s.id})">删</button>
           </div></td>
         </tr>`;}).join("")}</tbody>
@@ -1015,6 +1089,209 @@ function updateSellHint() {
         ? `实收 <b class="paid-num">${money(paid)}</b>，<b class="debt-num">还欠 ${money(debt)}</b>（之后可在「客户记录」里点「收款」登记还款）`
         : `实收 <b class="paid-num">${money(paid)}</b> · 已结清 ✓`);
   } else el.textContent = "填好数量和售价，这里自动算本笔毛利";
+}
+
+/* ================= 弹窗：多商品开单（一次卖多个商品，只出一张送货单） ================= */
+let bulkCtx = { paidTouched: false };
+
+function bulkStocks() {
+  return productStats().filter(s => s.stockQty > 1e-9)
+    .sort((a, b) => a.product.localeCompare(b.product, "zh"));
+}
+
+function openBulkSellModal() {
+  const stocks = bulkStocks();
+  if (!stocks.length) { alert("当前没有可卖的商品（库存都是 0）。\n\n先在「＋ 记一笔进货」里记进货，再来卖。"); return; }
+  bulkCtx = { paidTouched: false };
+  const rows = stocks.map(s => {
+    const lp = lastPriceOf(s.product);
+    return `<div class="pick-row" data-product="${esc(s.product)}">
+      <input type="checkbox" class="pick-chk">
+      <div class="nm">${esc(s.product)}<span class="sm">可卖 ${qtyText(s.stockQty)} 件 · 进价均价 ${money(s.inQty ? s.inValue / s.inQty : 0)}</span></div>
+      <input type="number" class="pick-qty" min="1" step="1" inputmode="numeric" value="1">
+      <input type="number" class="pick-price" min="0" step="0.01" inputmode="decimal" value="${lp ? lp : ""}" placeholder="0.00">
+    </div>`;
+  }).join("");
+
+  showModal("多商品开单 · 一次卖给一个客户", `
+    <div class="hint" style="margin-bottom:8px">勾上这次要卖的商品，填数量和卖价。同一张单只占一个单号、只打一张送货单；库存按「先进先出」自动扣。</div>
+    <div class="pick-tools">
+      <input id="pickSearch" placeholder="搜商品名称" oninput="filterPickRows(this.value)">
+      <button type="button" class="btn btn-outline btn-sm" onclick="togglePickAll()">全选 / 取消</button>
+    </div>
+    <div class="pick-list" id="pickList">
+      <div class="pick-head"><span></span><span>商品</span><span>数量</span><span>卖价</span></div>
+      ${rows}
+    </div>
+    <div class="form-grid" style="margin-top:12px">
+      <div class="form-row"><label>卖给谁（客户）*</label>
+        <input id="b-customer" list="dl-cust2" placeholder="客户名称">
+        <datalist id="dl-cust2">${customersInUse().map(c => `<option value="${esc(c)}">`).join("")}</datalist>
+      </div>
+      <div class="form-row"><label>卖货日期</label><input type="date" id="b-date" value="${today()}"></div>
+    </div>
+    <div class="form-row">
+      <label>本次实收金额（¥）— 没收全就填实际收到的</label>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input type="number" id="b-paid" min="0" step="0.01" placeholder="0.00" style="flex:1">
+        <button type="button" class="btn btn-outline btn-sm" onclick="fillBulkPaid('full')">全款</button>
+        <button type="button" class="btn btn-outline btn-sm" onclick="fillBulkPaid('zero')">先欠着</button>
+      </div>
+    </div>
+    <div class="hint" id="bulkHint"></div>
+  `, () => {
+    const cust = val("b-customer");
+    if (!cust) { alert("请填写客户名称（客户记录单要用）"); return false; }
+    const stockMap = {};
+    productStats().forEach(s => { stockMap[s.product] = s.stockQty; });
+    const picks = [];
+    document.querySelectorAll("#pickList .pick-row").forEach(row => {
+      const chk = row.querySelector(".pick-chk");
+      if (!chk || !chk.checked) return;
+      picks.push({
+        product: row.dataset.product,
+        qty: parseFloat(row.querySelector(".pick-qty").value) || 0,
+        price: parseFloat(row.querySelector(".pick-price").value) || 0
+      });
+    });
+    if (!picks.length) { alert("请先勾选要卖的商品"); return false; }
+    for (const pk of picks) {
+      if (!(pk.qty > 0)) { alert(`「${pk.product}」的卖出数量要大于 0`); return false; }
+      if (pk.qty > (stockMap[pk.product] || 0) + 1e-9) {
+        alert(`「${pk.product}」最多只能卖 ${qtyText(stockMap[pk.product] || 0)} 件`);
+        return false;
+      }
+    }
+    const res = createBulkOrder(picks, cust, val("b-date") || today(), document.getElementById("b-paid"));
+    ensureCustomer(cust);
+    save(); renderAll();
+    setTimeout(() => printOrderSlip(res.orderNo), 90);
+    return true;
+  });
+
+  const listEl = document.getElementById("pickList");
+  if (listEl && listEl.addEventListener) {
+    listEl.addEventListener("change", e => {
+      const row = e.target.closest ? e.target.closest(".pick-row") : null;
+      if (!row) return;
+      if (e.target.classList.contains("pick-chk")) row.classList.toggle("on", e.target.checked);
+      refreshBulkHint();
+    });
+    listEl.addEventListener("input", e => {
+      const row = e.target.closest ? e.target.closest(".pick-row") : null;
+      if (row && (e.target.classList.contains("pick-qty") || e.target.classList.contains("pick-price"))) {
+        const chk = row.querySelector(".pick-chk");
+        if (chk && !chk.checked) { chk.checked = true; row.classList.add("on"); }
+      }
+      refreshBulkHint();
+    });
+  }
+  const paidInput = document.getElementById("b-paid");
+  if (paidInput && paidInput.addEventListener) {
+    paidInput.addEventListener("input", () => { bulkCtx.paidTouched = true; refreshBulkHint(); });
+  }
+  refreshBulkHint();
+}
+
+function pickedRows() {
+  return [...document.querySelectorAll("#pickList .pick-row")].filter(row => {
+    const chk = row.querySelector(".pick-chk");
+    return chk && chk.checked;
+  });
+}
+function bulkSum() {
+  let total = 0, qty = 0;
+  const rows = pickedRows();
+  rows.forEach(row => {
+    const q = parseFloat(row.querySelector(".pick-qty").value) || 0;
+    const p = parseFloat(row.querySelector(".pick-price").value) || 0;
+    total += q * p; qty += q;
+  });
+  return { total: total, qty: qty, n: rows.length };
+}
+function refreshBulkHint() {
+  const el = document.getElementById("bulkHint");
+  if (!el) return;
+  const s = bulkSum();
+  const paidEl = document.getElementById("b-paid");
+  if (!bulkCtx.paidTouched && paidEl) paidEl.value = s.total > 0 ? String(Math.round(s.total * 100) / 100) : "";
+  const raw = paidEl ? String(paidEl.value).trim() : "";
+  const paid = raw === "" ? s.total : Math.max(0, Math.min(parseFloat(raw) || 0, s.total));
+  const debt = Math.round((s.total - paid) * 100) / 100;
+  if (!s.n) { el.textContent = "还没有勾选商品：勾上之后再填数量和卖价。"; return; }
+  el.innerHTML = `已选 <b>${s.n}</b> 种，共 <b>${qtyText(s.qty)}</b> 件，应收 <b>${money(s.total)}</b><br>`
+    + (debt > 0.005
+      ? `实收 <b class="paid-num">${money(paid)}</b>，<b class="debt-num">还欠 ${money(debt)}</b>（之后在「客户记录」里点「收款」登记）`
+      : `实收 <b class="paid-num">${money(paid)}</b> · 已结清 ✓`);
+}
+function fillBulkPaid(mode) {
+  const el = document.getElementById("b-paid");
+  if (!el) return;
+  const t = bulkSum().total;
+  el.value = mode === "zero" ? "0" : (t > 0 ? String(Math.round(t * 100) / 100) : "");
+  bulkCtx.paidTouched = (mode === "zero");
+  refreshBulkHint();
+}
+function filterPickRows(kw) {
+  kw = String(kw || "").toLowerCase().trim();
+  document.querySelectorAll("#pickList .pick-row").forEach(row => {
+    const hit = !kw || String(row.dataset.product || "").toLowerCase().includes(kw);
+    row.style.display = hit ? "" : "none";
+  });
+}
+function togglePickAll() {
+  const rows = [...document.querySelectorAll("#pickList .pick-row")].filter(r => r.style.display !== "none");
+  const allOn = rows.length > 0 && rows.every(r => {
+    const c = r.querySelector(".pick-chk");
+    return c && c.checked;
+  });
+  rows.forEach(r => {
+    const c = r.querySelector(".pick-chk");
+    if (!c) return;
+    c.checked = !allOn;
+    r.classList.toggle("on", !allOn);
+  });
+  refreshBulkHint();
+}
+
+// 真正落库：勾选的商品按批次先进先出拆成多笔卖出，共用同一个单号
+function createBulkOrder(picks, cust, date, paidEl) {
+  const orderNo = nextOrderNo(date);
+  const total = picks.reduce((a, p) => a + p.qty * p.price, 0);
+  const raw = paidEl ? String(paidEl.value).trim() : "";
+  const paidTotal = raw === "" ? total : Math.max(0, Math.min(parseFloat(raw) || 0, total));
+
+  const created = [];
+  picks.forEach(pk => {
+    let need = pk.qty;
+    stockBatchesOf(pk.product).forEach(r => {
+      if (need <= 1e-9) return;
+      const av = stockOf(r);
+      if (av <= 1e-9) return;
+      const use = Math.min(need, av);
+      need -= use;
+      const s = { id: nextId(), date: date, qty: use, price: pk.price, customer: cust, paid: 0, order: orderNo };
+      r.sales = r.sales || [];
+      r.sales.push(s);
+      created.push({ r: r, s: s });
+    });
+  });
+
+  // 实收金额按金额比例分摊到每笔明细，这样每笔的「欠款」都对得上
+  let remainPaid = Math.round(paidTotal * 100) / 100;
+  let remainAmt = Math.round(total * 100) / 100;
+  created.forEach((x, i) => {
+    const amt = Math.round(x.s.qty * x.s.price * 100) / 100;
+    let pay;
+    if (i === created.length - 1) pay = remainPaid;
+    else pay = remainAmt > 0.005 ? Math.round(remainPaid * (amt / remainAmt) * 100) / 100 : 0;
+    pay = Math.max(0, Math.min(amt, pay));
+    x.s.paid = pay;
+    remainPaid = Math.round((remainPaid - pay) * 100) / 100;
+    remainAmt = Math.round((remainAmt - amt) * 100) / 100;
+  });
+
+  return { orderNo: orderNo, count: created.length, total: total, paid: paidTotal };
 }
 
 function delSale(recordId, saleId) {
@@ -1263,6 +1540,61 @@ function printSlip(recordId, saleId) {
     <div class="slip-note">件数当面点清，货款请按约定结清。此单为交易凭证，请妥善保存。</div>
   `;
   openPrint("如需发给客户：点右上「打印 / 存 PDF」，或直接截图发给对方。");
+}
+
+/* 整单送货单：一张单里可能有多个商品（多商品开单生成） */
+function printOrderSlip(orderNo) {
+  const list = orderSales(orderNo);
+  if (!list.length) { alert("找不到这张单（对应的卖出记录可能已被删除）"); return; }
+  const lines = orderLines(orderNo);
+  const total = list.reduce((a, x) => a + saleTotal(x.s), 0);
+  const paid = list.reduce((a, x) => a + salePaid(x.s), 0);
+  const debt = Math.round((total - paid) * 100) / 100;
+  const qtyAll = list.reduce((a, x) => a + (Number(x.s.qty) || 0), 0);
+  const first = list[0].s;
+  const c = db.customers.find(x => x.name === first.customer) || {};
+  const blanks = Math.max(0, 5 - lines.length);
+
+  document.getElementById("printBody").innerHTML = `
+    ${slipHead("送 货 单")}
+    <div class="slip-meta">
+      <span>单号：${esc(orderNo)}</span>
+      <span>日期：${esc(first.date || today())}</span>
+      <span>客户：${esc(first.customer || "—")}</span>
+      <span>电话：${esc(c.phone || "—")}</span>
+    </div>
+    <table class="slip-table">
+      <thead><tr>
+        <th class="num" style="width:40px">序号</th><th>品名 / 规格</th>
+        <th class="num" style="width:60px">数量</th><th class="num" style="width:84px">单价</th><th class="num" style="width:96px">金额</th>
+      </tr></thead>
+      <tbody>
+        ${lines.map((l, i) => `<tr>
+          <td class="num">${i + 1}</td>
+          <td>${esc(l.product)}${l.note ? `<div style="font-size:12px;color:#4b5563">${esc(l.note)}</div>` : ""}</td>
+          <td class="num">${qtyText(l.qty)}</td>
+          <td class="num">${money(l.price)}</td>
+          <td class="num">${money(l.qty * l.price)}</td>
+        </tr>`).join("")}
+        ${Array.from({ length: blanks }).map(() => `<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td></tr>`).join("")}
+      </tbody>
+      <tfoot><tr>
+        <td colspan="2" style="font-weight:700">合计 ${lines.length} 项</td>
+        <td class="num" style="font-weight:700">${qtyText(qtyAll)}</td>
+        <td></td>
+        <td class="num" style="font-weight:700">${money(total)}</td>
+      </tr></tfoot>
+    </table>
+    <div class="slip-foot">
+      <div class="row"><span>合计金额</span><b>${money(total)}</b></div>
+      <div class="row"><span>已收金额</span><b>${money(paid)}</b></div>
+      <div class="row"><span>本次欠款</span><b style="color:${debt > 0.005 ? "#b91c1c" : "#111827"}">${money(debt)}</b></div>
+      <div class="row"><span>金额大写</span><b style="font-weight:600">${rmbUpper(total)}</b></div>
+    </div>
+    <div class="slip-sign"><span>送货人签字</span><span>客户签收</span><span>日期</span></div>
+    <div class="slip-note">件数当面点清，货款请按约定结清。此单为交易凭证，请妥善保存。</div>
+  `;
+  openPrint(`共 ${lines.length} 种商品、${qtyText(qtyAll)} 件，合计 ${money(total)}。可点右上「打印 / 存 PDF」或截图发给客户。`);
 }
 
 function printStatement(name) {
