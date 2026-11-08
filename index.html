@@ -204,7 +204,7 @@
 <div class="header">
   <div>
     <h1>🚚 嘉诺汽配 · 进销货记录</h1>
-    <div class="sub">一条记一批进货：进价、数量、商家；卖多少记多少，库存自动算｜数据存本机，建议定期导出备份<span id="verTag" style="opacity:.55"> · v14</span></div>
+    <div class="sub">一条记一批进货：进价、数量、商家；卖多少记多少，库存自动算｜数据存本机，建议定期导出备份<span id="verTag" style="opacity:.55"> · v15</span></div>
   </div>
   <div class="header-actions">
     <button class="btn btn-outline" id="fsBtn" onclick="toggleFullscreen()" style="display:none">⛶ 全屏</button>
@@ -2228,6 +2228,7 @@ const SHOP_BIZ = "业务范围：货车装具 挂斗五金 淋水配件 灯具�
 const SHOP_ADDR = "地址：河北省邢台市巨鹿县城西";
 const SHOP_TEL = "电话：15732953285  15530937356";
 const SLIP_SIGNER = "老宋";
+const SLIP_NOTE = "件数当面点清，货款请按约定结清。此单为交易凭证，请妥善保存。";
 var slipCtx = { data: null };
 
 function slipBizBlock() {
@@ -2236,7 +2237,8 @@ function slipBizBlock() {
       <div>${esc(SHOP_ADDR)}</div>
       <div>${esc(SHOP_TEL)}</div>
     </div>
-    <div class="slip-sign"><span>送货人签字：${esc(SLIP_SIGNER)}</span><span>客户签收</span><span>日期</span></div>`;
+    <div class="slip-sign"><span>送货人签字：${esc(SLIP_SIGNER)}</span><span>客户签收</span><span>日期</span></div>
+    <div class="slip-note">${esc(SLIP_NOTE)}</div>`;
 }
 // 表格最后一行：金额大写 + 合计金额
 function slipFootRow(total) {
@@ -2422,7 +2424,8 @@ function renderSlipImage(d) {
   const tableBottom = tableTop + headH2 + rows * rowH + footH;
   const bizTop = tableBottom + 22;
   const signY = bizTop + bizLines.length * 23 + 40;
-  const H = signY + 44 + PAD;
+  const noteY = signY + 42;
+  const H = noteY + 34 + PAD;
 
   const cv = document.createElement("canvas");
   cv.width = W * S;
@@ -2503,6 +2506,14 @@ function renderSlipImage(d) {
     ctx.beginPath(); ctx.moveTo(x0, signY); ctx.lineTo(x0 + signW, signY); ctx.stroke();
     put(t, x0, signY + 16, F(12.5), "#374151");
   });
+
+  // 底部说明（与打印版保持一致）
+  ctx.strokeStyle = "#d1d5db";
+  ctx.lineWidth = 1;
+  if (ctx.setLineDash) ctx.setLineDash([4, 4]);
+  ctx.beginPath(); ctx.moveTo(PAD, noteY); ctx.lineTo(W - PAD, noteY); ctx.stroke();
+  if (ctx.setLineDash) ctx.setLineDash([]);
+  put(SLIP_NOTE, PAD, noteY + 16, F(12), "#6b7280");
 
   try { return cv.toDataURL("image/png"); } catch (e) { return ""; }
 }
