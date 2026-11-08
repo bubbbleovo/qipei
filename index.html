@@ -148,7 +148,7 @@
 <div class="header">
   <div>
     <h1>🚚 嘉诺汽配 · 进销货记录</h1>
-    <div class="sub">一条记一批进货：进价、数量、商家；卖多少记多少，库存自动算｜数据存本机，建议定期导出备份<span id="verTag" style="opacity:.55"> · v10</span></div>
+    <div class="sub">一条记一批进货：进价、数量、商家；卖多少记多少，库存自动算｜数据存本机，建议定期导出备份<span id="verTag" style="opacity:.55"> · v11</span></div>
   </div>
   <div class="header-actions">
     <button class="btn btn-outline" id="fsBtn" onclick="toggleFullscreen()" style="display:none">⛶ 全屏</button>
@@ -611,7 +611,7 @@ function salesCell(r) {
     const link = s.order
       ? `<a class="mini-link" data-order="${esc(s.order)}" onclick="printOrderSlip(this.dataset.order)">整单</a><span class="order-tag">${esc(String(s.order).slice(-3))}</span>`
       : `<a class="mini-link" onclick="printSlip(${r.id},${s.id})">送货单</a>`;
-    return `<div class="sale-line">${esc(s.customer || "未填客户")} <b>${qtyText(s.qty)}</b>件 × ${money(s.price)} <span class="muted">${esc(s.date || "")}</span>${tag}${link}</div>`;
+    return `<div class="sale-line">${esc(s.customer || "未填客户")} <b>${qtyText(s.qty)}</b>件 × ${money(s.price)} <span class="muted">${esc(s.date || "")}</span>${tag}${link}<a class="mini-link" onclick="openEditSaleModal(${r.id},${s.id})">改</a></div>`;
   }).join("");
 }
 
@@ -1006,6 +1006,7 @@ function openSellModal(id) {
             ${s.order
               ? `<button class="btn btn-outline btn-sm" data-order="${esc(s.order)}" onclick="printOrderSlip(this.dataset.order)">整单</button>`
               : `<button class="btn btn-outline btn-sm" onclick="printSlip(${r.id},${s.id})">单</button>`}
+            <button class="btn btn-outline btn-sm" onclick="openEditSaleModal(${r.id},${s.id})">改</button>
             <button class="btn btn-danger btn-sm" onclick="delSale(${r.id},${s.id})">删</button>
           </div></td>
         </tr>`;}).join("")}</tbody>
@@ -1089,6 +1090,109 @@ function updateSellHint() {
         ? `实收 <b class="paid-num">${money(paid)}</b>，<b class="debt-num">还欠 ${money(debt)}</b>（之后可在「客户记录」里点「收款」登记还款）`
         : `实收 <b class="paid-num">${money(paid)}</b> · 已结清 ✓`);
   } else el.textContent = "填好数量和售价，这里自动算本笔毛利";
+}
+
+/* ================= 弹窗：修改一笔卖出（数量/价格/客户/日期/实收写错了） ================= */
+function openEditSaleModal(recordId, saleId) {
+  const r = db.records.find(x => x.id === recordId);
+  if (!r) return;
+  const s = (r.sales || []).find(x => x.id === saleId);
+  if (!s) return;
+  const others = (r.sales || []).filter(x => x.id !== saleId).reduce((a, x) => a + (Number(x.qty) || 0), 0);
+  const maxQty = Math.max(0, (Number(r.qty) || 0) - others);
+  const ordSales = s.order ? orderSales(s.order) : [];
+  // 原来就是全款的，改数量/售价时实收自动跟着变；原来就有欠款的，保留用户填的实收
+  const paidTouched = Math.abs(salePaid(s) - (Number(s.qty) || 0) * (Number(s.price) || 0)) > 0.005;
+  sellCtx = { cost: Number(r.cost) || 0, maxQty: maxQty, paidTouched: paidTouched };
+  const custOpts = customersInUse().map(c => `<option value="${esc(c)}">`).join("");
+
+  showModal("修改卖出记录 · " + r.product, `
+    <div class="batch-info">
+      这批：${esc(r.date)} 进的 <b>${qtyText(r.qty)}</b> 件，进价 ${money(r.cost)}/件${r.supplier ? "，来自 " + esc(r.supplier) : ""}<br>
+      这笔原来卖了 <b>${qtyText(s.qty)}</b> 件 × ${money(s.price)}。改完库存、欠款、利润都会自动重算。
+    </div>
+    ${ordSales.length > 1 ? `<div class="hint" style="background:#fffbeb;border-color:#fde68a;color:#92400e;margin-top:8px">这笔属于整单 <b>${esc(s.order)}</b>（共 ${ordSales.length} 笔）：改客户/日期会同步到整单其他几笔，数量、售价只改这一笔。</div>` : ""}
+    <div class="form-grid" style="margin-top:12px">
+      <div class="form-row"><label>卖出数量 *</label><input type="number" id="e-qty" min="1" step="1" value="${Number(s.qty) || 0}"></div>
+      <div class="form-row"><label>卖出单价（¥/件）*</label><input type="number" id="e-price" min="0" step="0.01" value="${Number(s.price) || 0}"></div>
+    </div>
+    <div class="form-row"><label>卖给谁（客户）*</label>
+      <input id="e-customer" list="dl-cust-e" value="${esc(s.customer || "")}" placeholder="客户名称">
+      <datalist id="dl-cust-e">${custOpts}</datalist>
+    </div>
+    <div class="form-row"><label>卖货日期</label><input type="date" id="e-date" value="${esc(s.date || today())}"></div>
+    <div class="form-row">
+      <label>实收金额（¥）— 这笔实际收到的钱</label>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input type="number" id="e-paid" min="0" step="0.01" value="${Math.round(salePaid(s) * 100) / 100}" style="flex:1">
+        <button type="button" class="btn btn-outline btn-sm" onclick="fillEditPaid('full')">全款</button>
+        <button type="button" class="btn btn-outline btn-sm" onclick="fillEditPaid('zero')">先欠着</button>
+      </div>
+    </div>
+    <div class="hint" id="editHint"></div>
+  `, () => {
+    const q = numv("e-qty"), p = numv("e-price"), cust = val("e-customer");
+    if (!(q > 0)) { alert("请填写卖出数量"); return false; }
+    if (q > maxQty + 1e-9) { alert(`这批最多只能卖 ${qtyText(maxQty)} 件（已经扣掉其他几笔卖出）`); return false; }
+    if (p < 0) { alert("售价不能是负数"); return false; }
+    if (!cust) { alert("请填写客户名称（客户记录单要用）"); return false; }
+    const total = q * p;
+    const raw = String(document.getElementById("e-paid").value || "").trim();
+    const paid = raw === "" ? total : Math.max(0, Math.min(numv("e-paid"), total));
+
+    s.qty = q; s.price = p; s.customer = cust;
+    s.date = val("e-date") || s.date || today();
+    s.paid = paid;
+    // 整单的客户、日期保持一致，避免同一张单出现两个客户
+    if (s.order) orderSales(s.order).forEach(x => { x.s.customer = cust; x.s.date = s.date; });
+
+    ensureCustomer(cust);
+    save(); renderAll(); return true;
+  });
+
+  ["e-qty", "e-price"].forEach(fid => {
+    const el = document.getElementById(fid);
+    if (el && el.addEventListener) el.addEventListener("input", () => {
+      if (!sellCtx.paidTouched) {
+        const el2 = document.getElementById("e-paid");
+        const t = numv("e-qty") * numv("e-price");
+        if (el2) el2.value = t > 0 ? String(Math.round(t * 100) / 100) : "";
+      }
+      updateEditHint();
+    });
+  });
+  const paidEl = document.getElementById("e-paid");
+  if (paidEl && paidEl.addEventListener) {
+    paidEl.addEventListener("input", () => { sellCtx.paidTouched = true; updateEditHint(); });
+  }
+  updateEditHint();
+}
+
+function updateEditHint() {
+  const el = document.getElementById("editHint");
+  if (!el) return;
+  const maxQty = (sellCtx && sellCtx.maxQty) || 0;
+  const cost = (sellCtx && sellCtx.cost) || 0;
+  const q = numv("e-qty"), p = numv("e-price");
+  const total = q * p;
+  const paid = Math.max(0, Math.min(numv("e-paid"), total));
+  const debt = Math.round((total - paid) * 100) / 100;
+  if (!(q > 0)) { el.textContent = "填好数量和售价，这里自动算这一笔的毛利"; return; }
+  const profit = q * (p - cost);
+  el.innerHTML = `本笔：应收 <b>${money(total)}</b>，成本 <b>${money(q * cost)}</b>，毛利 <b style="color:${profit >= 0 ? "#16a34a" : "#dc2626"}">${money(profit)}</b>`
+    + (q > maxQty + 1e-9 ? `<br><b class="debt-num">这批最多只能卖 ${qtyText(maxQty)} 件</b>` : "")
+    + "<br>"
+    + (debt > 0.005
+      ? `实收 <b class="paid-num">${money(paid)}</b>，<b class="debt-num">还欠 ${money(debt)}</b>`
+      : `实收 <b class="paid-num">${money(paid)}</b> · 已结清 ✓`);
+}
+
+function fillEditPaid(mode) {
+  const el = document.getElementById("e-paid");
+  if (!el) return;
+  const total = numv("e-qty") * numv("e-price");
+  el.value = mode === "zero" ? "0" : String(Math.round(total * 100) / 100);
+  updateEditHint();
 }
 
 /* ================= 弹窗：多商品开单（一次卖多个商品，只出一张送货单） ================= */
