@@ -1,4 +1,4 @@
-const CACHE_NAME = "qipei-v7";
+const CACHE_NAME = "qipei-v8";
 const ASSETS = [
   "./",
   "./index.html",
@@ -21,16 +21,34 @@ self.addEventListener("activate", e => {
   );
 });
 
-// 请求：缓存优先，未命中则联网并写入缓存
+// 请求：页面走「联网优先」（保证总是最新版，断网时用缓存）；静态资源走「缓存优先」
 self.addEventListener("fetch", e => {
-  if (e.request.method !== "GET") return;
-  e.respondWith(
-    caches.match(e.request).then(hit => {
-      if (hit) return hit;
-      return fetch(e.request).then(res => {
-        if (res.ok && new URL(e.request.url).origin === self.location.origin) {
+  const req = e.request;
+  if (req.method !== "GET") return;
+  const sameOrigin = new URL(req.url).origin === self.location.origin;
+
+  if (req.mode === "navigate") {
+    e.respondWith(
+      fetch(req).then(res => {
+        if (sameOrigin && res.ok) {
           const copy = res.clone();
-          caches.open(CACHE_NAME).then(c => c.put(e.request, copy));
+          caches.open(CACHE_NAME).then(c => c.put("./index.html", copy));
+        }
+        return res;
+      }).catch(() =>
+        caches.match("./index.html").then(hit => hit || caches.match("./"))
+      )
+    );
+    return;
+  }
+
+  e.respondWith(
+    caches.match(req).then(hit => {
+      if (hit) return hit;
+      return fetch(req).then(res => {
+        if (res.ok && sameOrigin) {
+          const copy = res.clone();
+          caches.open(CACHE_NAME).then(c => c.put(req, copy));
         }
         return res;
       }).catch(() => caches.match("./index.html"));
