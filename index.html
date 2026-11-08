@@ -93,7 +93,7 @@
 <div class="header">
   <div>
     <h1>🚚 嘉诺汽配 · 进销货记录</h1>
-    <div class="sub">一条记一批进货：进价、数量、商家；卖多少记多少，库存自动算｜数据存本机，建议定期导出备份</div>
+    <div class="sub">一条记一批进货：进价、数量、商家；卖多少记多少，库存自动算｜数据存本机，建议定期导出备份<span id="verTag" style="opacity:.55"> · v8</span></div>
   </div>
   <div class="header-actions">
     <button class="btn btn-outline" id="fsBtn" onclick="toggleFullscreen()" style="display:none">⛶ 全屏</button>
@@ -850,7 +850,16 @@ window.__app = {
   save: save, renderAll: renderAll
 };
 if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
-  navigator.serviceWorker.register("./sw.js").catch(() => {});
+  const hadController = !!navigator.serviceWorker.controller;
+  let reloading = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (!hadController || reloading) return;
+    reloading = true;
+    location.reload();
+  });
+  navigator.serviceWorker.register("./sw.js", { updateViaCache: "none" }).then(reg => {
+    try { reg.update(); } catch (e) {}
+  }).catch(() => {});
 }
 </script>
 
@@ -883,21 +892,23 @@ function isStandaloneMode() {
 function toggleFullscreen() {
   const d = document, el = d.documentElement;
   const inFs = d.fullscreenElement || d.webkitFullscreenElement;
+  const fn = el.requestFullscreen || el.webkitRequestFullscreen;
+  if (inFs) {
+    try { (d.exitFullscreen || d.webkitExitFullscreen || function () {}).call(d); } catch (e) {}
+    return;
+  }
+  if (!fn) {
+    alert("这个浏览器不支持全屏。\n\n可以这样：\n1) 点浏览器菜单里的「全屏」或「沉浸模式」\n2) 或换 Chrome / Edge 浏览器打开这个网址再安装成应用");
+    return;
+  }
   try {
-    if (inFs) {
-      (d.exitFullscreen || d.webkitExitFullscreen || function () {}).call(d);
-    } else {
-      const fn = el.requestFullscreen || el.webkitRequestFullscreen;
-      if (fn) {
-        const r = fn.call(el);
-        if (r && r.catch) r.catch(() => {});
-      }
-    }
+    const r = fn.call(el);
+    if (r && r.catch) r.catch(() => {});
   } catch (e) {}
 }
 document.addEventListener("fullscreenchange", () => {
   const btn = document.getElementById("fsBtn");
-  if (btn) btn.textContent = (document.fullscreenElement || document.webkitFullscreenElement) ? "⛶ 退出全屏" : "⛶ 全屏";
+  if (btn) btn.textContent = (document.fullscreenElement || document.webkitFullscreenElement) ? "⛶ 退出" : "⛶ 全屏";
 });
 
 /* ================= 添加到主屏幕引导 ================= */
@@ -916,9 +927,7 @@ document.addEventListener("fullscreenchange", () => {
   // 手机浏览器里显示「全屏」按钮（点一下隐藏地址栏，接近 App 全屏效果）
   if (!standalone && typeof isMobileUA === "function" && isMobileUA()) {
     const fsBtn = document.getElementById("fsBtn");
-    if (fsBtn && (document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen)) {
-      fsBtn.style.display = "inline-block";
-    }
+    if (fsBtn) fsBtn.style.display = "inline-block";
   }
 
   if (standalone || localStorage.getItem(KEY)) return;
