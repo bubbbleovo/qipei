@@ -88,6 +88,7 @@
   .paid-num { color: #16a34a; font-weight: 600; }
   .mini-link { color: #2563eb; font-size: 11px; cursor: pointer; margin-left: 6px; text-decoration: underline; white-space: nowrap; }
   .mini-link:active { opacity: .55; }
+  .mini-link.del { color: #dc2626; }
   .bar-wrap { background: #eef2f7; border-radius: 4px; height: 8px; width: 90px; overflow: hidden; }
   .bar { height: 100%; background: linear-gradient(90deg,#3b82f6,#1e3a5f); border-radius: 4px; }
   /* ===== 多商品开单（勾选） ===== */
@@ -127,10 +128,18 @@
   .slip-foot .row b { min-width: 96px; text-align: right; }
   .slip-sign { display: flex; justify-content: space-between; gap: 20px; margin-top: 36px; font-size: 13px; color: #374151; }
   .slip-sign span { border-top: 1px solid #9ca3af; padding-top: 4px; min-width: 130px; }
+  .slip-biz { margin-top: 20px; font-size: 12.5px; line-height: 1.9; color: #111827; }
+  .slip-biz div { margin-bottom: 1px; }
   .slip-note { margin-top: 20px; font-size: 12px; color: #6b7280; border-top: 1px dashed #d1d5db; padding-top: 8px; }
+  /* 送货单保存图片 */
+  .img-overlay { display: none; position: fixed; inset: 0; background: #111827; overflow: auto; z-index: 320; -webkit-overflow-scrolling: touch; }
+  .img-overlay.show { display: block; }
+  .img-wrap { padding: 12px; }
+  .img-wrap img { display: block; width: 100%; max-width: 760px; margin: 0 auto; background: #fff; border-radius: 4px; box-shadow: 0 2px 14px rgba(0,0,0,.4); }
+  .img-tip { color: rgba(255,255,255,.75); font-size: 12px; text-align: center; padding: 4px 12px 26px; }
   @media print {
     body { background: #fff !important; }
-    .header, .nav, .container, .modal-mask, .print-bar, .shop-edit, #installBar { display: none !important; }
+    .header, .nav, .container, .modal-mask, .print-bar, .shop-edit, #installBar, .img-overlay { display: none !important; }
     .print-overlay { position: static !important; display: block !important; background: #fff !important; overflow: visible !important; }
     .slip-sheet { max-width: none; margin: 0; padding: 0; box-shadow: none; }
     @page { margin: 14mm 12mm; }
@@ -148,7 +157,7 @@
 <div class="header">
   <div>
     <h1>🚚 嘉诺汽配 · 进销货记录</h1>
-    <div class="sub">一条记一批进货：进价、数量、商家；卖多少记多少，库存自动算｜数据存本机，建议定期导出备份<span id="verTag" style="opacity:.55"> · v11</span></div>
+    <div class="sub">一条记一批进货：进价、数量、商家；卖多少记多少，库存自动算｜数据存本机，建议定期导出备份<span id="verTag" style="opacity:.55"> · v12</span></div>
   </div>
   <div class="header-actions">
     <button class="btn btn-outline" id="fsBtn" onclick="toggleFullscreen()" style="display:none">⛶ 全屏</button>
@@ -251,6 +260,7 @@
   <div class="print-bar">
     <span class="tip" id="printTip"></span>
     <button class="btn btn-outline" onclick="closePrint()">关闭</button>
+    <button class="btn btn-success" onclick="showSlipImage()">🖼 保存图片</button>
     <button class="btn btn-primary" onclick="doPrint()">🖨 打印 / 存 PDF</button>
   </div>
   <div class="shop-edit">
@@ -260,6 +270,17 @@
     <span>显示在单子顶部，只存本机</span>
   </div>
   <div class="slip-sheet" id="printBody"></div>
+</div>
+
+<!-- 送货单图片（长按可保存到相册） -->
+<div class="img-overlay" id="imgOverlay">
+  <div class="print-bar">
+    <span class="tip">长按图片可直接保存到相册</span>
+    <button class="btn btn-outline" onclick="closeImg()">关闭</button>
+    <button class="btn btn-primary" onclick="downloadSlipImage()">💾 保存图片</button>
+  </div>
+  <div class="img-wrap"><img id="slipImg" alt="送货单"></div>
+  <div class="img-tip">手机上也可以长按图片 → 保存图片 / 添加到相册</div>
 </div>
 
 <div class="modal-mask" id="modalMask">
@@ -611,7 +632,7 @@ function salesCell(r) {
     const link = s.order
       ? `<a class="mini-link" data-order="${esc(s.order)}" onclick="printOrderSlip(this.dataset.order)">整单</a><span class="order-tag">${esc(String(s.order).slice(-3))}</span>`
       : `<a class="mini-link" onclick="printSlip(${r.id},${s.id})">送货单</a>`;
-    return `<div class="sale-line">${esc(s.customer || "未填客户")} <b>${qtyText(s.qty)}</b>件 × ${money(s.price)} <span class="muted">${esc(s.date || "")}</span>${tag}${link}<a class="mini-link" onclick="openEditSaleModal(${r.id},${s.id})">改</a></div>`;
+    return `<div class="sale-line">${esc(s.customer || "未填客户")} <b>${qtyText(s.qty)}</b>件 × ${money(s.price)} <span class="muted">${esc(s.date || "")}</span>${tag}${link}<a class="mini-link" onclick="openEditSaleModal(${r.id},${s.id})">改</a><a class="mini-link del" onclick="delSale(${r.id},${s.id})">删</a></div>`;
   }).join("");
 }
 
@@ -658,7 +679,6 @@ function renderRecords() {
         <td>${salesCell(r)}</td>
         <td class="num" style="color:${pf >= 0 ? "#16a34a" : "#dc2626"};font-weight:600">${sq ? money(pf) : "-"}</td>
         <td><div class="row-actions">
-          ${st > 0 ? `<button class="btn btn-success btn-sm" onclick="openSellModal(${r.id})">卖</button>` : ""}
           <button class="btn btn-outline btn-sm" onclick="openRecordModal(${r.id})">改</button>
           <button class="btn btn-danger btn-sm" onclick="delRecord(${r.id})">删</button>
         </div></td>
@@ -726,7 +746,6 @@ function renderStock() {
       <td class="num">${qtyText(s.inQty)} 件</td>
       <td class="num">${qtyText(s.soldQty)} 件</td>
       <td><div class="row-actions">
-        ${s.stockQty > 0 ? `<button class="btn btn-success btn-sm" data-product="${esc(s.product)}" onclick="sellProduct(this.dataset.product)">卖</button>` : ""}
         <button class="btn btn-outline btn-sm" data-product="${esc(s.product)}" onclick="showProductRecords(this.dataset.product)">看记录</button>
       </div></td>
     </tr>`).join("")}</tbody>`;
@@ -1600,14 +1619,45 @@ function rmbUpper(n) {
   return (neg ? "负" : "") + intStr + dec;
 }
 
+/* 送货单固定的店铺信息（单子下方） */
+const SHOP_BIZ = "业务范围：货车装具 挂斗五金 淋水配件 灯具电器 滤清器 刹车片 油封 油管 刹车管 泵阀 灭火器牌照扣 警示牌 自喷漆 手套 吊带 钢丝绳等各种配件";
+const SHOP_ADDR = "地址：河北省邢台市巨鹿县城西";
+const SHOP_TEL = "电话：15732953285  15530937356";
+const SLIP_SIGNER = "老宋";
+var slipCtx = { data: null };
+
+function slipBizBlock() {
+  return `<div class="slip-biz">
+      <div>${esc(SHOP_BIZ)}</div>
+      <div>${esc(SHOP_ADDR)}</div>
+      <div>${esc(SHOP_TEL)}</div>
+    </div>
+    <div class="slip-sign"><span>送货人签字：${esc(SLIP_SIGNER)}</span><span>客户签收</span><span>日期</span></div>`;
+}
+// 表格最后一行：金额大写 + 合计金额
+function slipFootRow(total) {
+  return `<tfoot><tr>
+      <td colspan="4" style="font-weight:700">金额大写：<span style="font-weight:600;letter-spacing:1px">${rmbUpper(total)}</span></td>
+      <td class="num" style="font-weight:700">${money(total)}</td>
+    </tr></tfoot>`;
+}
+
 function printSlip(recordId, saleId) {
   const r = db.records.find(x => x.id === recordId);
   if (!r) return;
   const s = (r.sales || []).find(x => x.id === saleId);
   if (!s) return;
-  const total = saleTotal(s), paid = salePaid(s), debt = saleDebt(s);
+  const total = saleTotal(s);
   const c = db.customers.find(x => x.name === s.customer) || {};
   const no = "JN" + String(s.date || today()).replace(/-/g, "") + "-" + String(s.id % 10000).padStart(4, "0");
+  const shop = getShop();
+
+  slipCtx.data = {
+    shop: shop.name, shopPhone: shop.phone, no: no, date: s.date || today(),
+    customer: s.customer || "", custPhone: c.phone || "",
+    lines: [{ product: r.product, note: r.note || "", qty: s.qty, price: s.price, amount: total }],
+    total: total
+  };
 
   document.getElementById("printBody").innerHTML = `
     ${slipHead("送 货 单")}
@@ -1633,17 +1683,11 @@ function printSlip(recordId, saleId) {
         <tr><td>&nbsp;</td><td></td><td></td><td></td><td></td></tr>
         <tr><td>&nbsp;</td><td></td><td></td><td></td><td></td></tr>
       </tbody>
+      ${slipFootRow(total)}
     </table>
-    <div class="slip-foot">
-      <div class="row"><span>合计金额</span><b>${money(total)}</b></div>
-      <div class="row"><span>已收金额</span><b>${money(paid)}</b></div>
-      <div class="row"><span>本次欠款</span><b style="color:${debt > 0.005 ? "#b91c1c" : "#111827"}">${money(debt)}</b></div>
-      <div class="row"><span>金额大写</span><b style="font-weight:600">${rmbUpper(total)}</b></div>
-    </div>
-    <div class="slip-sign"><span>送货人签字</span><span>客户签收</span><span>日期</span></div>
-    <div class="slip-note">件数当面点清，货款请按约定结清。此单为交易凭证，请妥善保存。</div>
+    ${slipBizBlock()}
   `;
-  openPrint("如需发给客户：点右上「打印 / 存 PDF」，或直接截图发给对方。");
+  openPrint("可点「保存图片」直接存成图片发给客户，或「打印 / 存 PDF」。");
 }
 
 /* 整单送货单：一张单里可能有多个商品（多商品开单生成） */
@@ -1652,12 +1696,18 @@ function printOrderSlip(orderNo) {
   if (!list.length) { alert("找不到这张单（对应的卖出记录可能已被删除）"); return; }
   const lines = orderLines(orderNo);
   const total = list.reduce((a, x) => a + saleTotal(x.s), 0);
-  const paid = list.reduce((a, x) => a + salePaid(x.s), 0);
-  const debt = Math.round((total - paid) * 100) / 100;
   const qtyAll = list.reduce((a, x) => a + (Number(x.s.qty) || 0), 0);
   const first = list[0].s;
   const c = db.customers.find(x => x.name === first.customer) || {};
-  const blanks = Math.max(0, 5 - lines.length);
+  const blanks = Math.max(0, 4 - lines.length);
+  const shop = getShop();
+
+  slipCtx.data = {
+    shop: shop.name, shopPhone: shop.phone, no: orderNo, date: first.date || today(),
+    customer: first.customer || "", custPhone: c.phone || "",
+    lines: lines.map(l => ({ product: l.product, note: l.note || "", qty: l.qty, price: l.price, amount: l.qty * l.price })),
+    total: total
+  };
 
   document.getElementById("printBody").innerHTML = `
     ${slipHead("送 货 单")}
@@ -1669,8 +1719,8 @@ function printOrderSlip(orderNo) {
     </div>
     <table class="slip-table">
       <thead><tr>
-        <th class="num" style="width:40px">序号</th><th>品名 / 规格</th>
-        <th class="num" style="width:60px">数量</th><th class="num" style="width:84px">单价</th><th class="num" style="width:96px">金额</th>
+        <th class="num" style="width:44px">序号</th><th>品名 / 规格</th>
+        <th class="num" style="width:70px">数量</th><th class="num" style="width:92px">单价</th><th class="num" style="width:100px">金额</th>
       </tr></thead>
       <tbody>
         ${lines.map((l, i) => `<tr>
@@ -1682,23 +1732,175 @@ function printOrderSlip(orderNo) {
         </tr>`).join("")}
         ${Array.from({ length: blanks }).map(() => `<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td></tr>`).join("")}
       </tbody>
-      <tfoot><tr>
-        <td colspan="2" style="font-weight:700">合计 ${lines.length} 项</td>
-        <td class="num" style="font-weight:700">${qtyText(qtyAll)}</td>
-        <td></td>
-        <td class="num" style="font-weight:700">${money(total)}</td>
-      </tr></tfoot>
+      ${slipFootRow(total)}
     </table>
-    <div class="slip-foot">
-      <div class="row"><span>合计金额</span><b>${money(total)}</b></div>
-      <div class="row"><span>已收金额</span><b>${money(paid)}</b></div>
-      <div class="row"><span>本次欠款</span><b style="color:${debt > 0.005 ? "#b91c1c" : "#111827"}">${money(debt)}</b></div>
-      <div class="row"><span>金额大写</span><b style="font-weight:600">${rmbUpper(total)}</b></div>
-    </div>
-    <div class="slip-sign"><span>送货人签字</span><span>客户签收</span><span>日期</span></div>
-    <div class="slip-note">件数当面点清，货款请按约定结清。此单为交易凭证，请妥善保存。</div>
+    ${slipBizBlock()}
   `;
-  openPrint(`共 ${lines.length} 种商品、${qtyText(qtyAll)} 件，合计 ${money(total)}。可点右上「打印 / 存 PDF」或截图发给客户。`);
+  openPrint(`共 ${lines.length} 种商品、${qtyText(qtyAll)} 件，合计 ${money(total)}。可点「保存图片」发给客户。`);
+}
+
+/* ================= 送货单存成图片（Canvas 手绘，不依赖网络） ================= */
+function showSlipImage() {
+  if (!slipCtx.data) { alert("请先打开一张送货单"); return; }
+  const url = renderSlipImage(slipCtx.data);
+  if (!url) { alert("生成图片失败，可以直接截图保存"); return; }
+  document.getElementById("slipImg").src = url;
+  document.getElementById("imgOverlay").classList.add("show");
+  document.getElementById("imgOverlay").scrollTop = 0;
+  document.body.style.overflow = "hidden";
+}
+function closeImg() {
+  const ov = document.getElementById("imgOverlay");
+  ov.classList.remove("show");
+  const img = document.getElementById("slipImg");
+  if (img) img.removeAttribute("src");
+  const printing = document.getElementById("printOverlay").classList.contains("show");
+  document.body.style.overflow = printing ? "hidden" : "";
+}
+function slipFileName() {
+  const d = slipCtx.data || {};
+  const clean = s => String(s || "").replace(/[\\/:*?"<>|\r\n\t]/g, "").trim();
+  return "送货单_" + (clean(d.customer) || "客户") + "_" + clean(d.no) + ".png";
+}
+function downloadSlipImage() {
+  const img = document.getElementById("slipImg");
+  if (!img || !img.getAttribute("src")) return;
+  const name = slipFileName();
+  // 装成 App 的手机：走原生保存到相册
+  if (window.AndroidBridge && typeof AndroidBridge.saveImageToPictures === "function") {
+    try { alert(AndroidBridge.saveImageToPictures(name, img.src)); return; } catch (e) { }
+  }
+  const a = document.createElement("a");
+  a.href = img.src;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { if (a.parentNode) a.parentNode.removeChild(a); }, 800);
+}
+
+function renderSlipImage(d) {
+  const W = 760, PAD = 40, S = 2;
+  const F = (size, weight) => `${weight || 400} ${size}px "Microsoft YaHei","PingFang SC","Noto Sans CJK SC","Heiti SC",sans-serif`;
+  const inner = W - PAD * 2;
+  const colIdx = 56, colQty = 74, colPrice = 104, colAmt = 116;
+  const colName = inner - colIdx - colQty - colPrice - colAmt;
+  const xs = [PAD, PAD + colIdx, PAD + colIdx + colName, PAD + colIdx + colName + colQty,
+    PAD + colIdx + colName + colQty + colPrice, W - PAD];
+
+  // 量文字用的临时画布
+  const m = document.createElement("canvas").getContext("2d");
+  const wrapText = (str, maxW, font) => {
+    m.font = font;
+    const out = [];
+    let cur = "";
+    for (const ch of String(str)) {
+      if (cur && m.measureText(cur + ch).width > maxW) { out.push(cur); cur = ch; }
+      else cur += ch;
+    }
+    if (cur) out.push(cur);
+    return out;
+  };
+  const cutText = (str, maxW, font) => {
+    m.font = font;
+    let s = String(str == null ? "" : str);
+    if (m.measureText(s).width <= maxW) return s;
+    while (s.length > 1 && m.measureText(s + "…").width > maxW) s = s.slice(0, -1);
+    return s + "…";
+  };
+
+  const bizFont = F(12.5);
+  const bizLines = [SHOP_BIZ, SHOP_ADDR, SHOP_TEL].reduce((acc, t) => acc.concat(wrapText(t, inner - 4, bizFont)), []);
+
+  const headH = 34 + (d.shopPhone ? 18 : 0) + 28 + 18 + 44;
+  const rows = Math.max(4, d.lines.length);
+  const rowH = 38, headH2 = 34, footH = 44;
+  const tableTop = PAD + headH;
+  const tableBottom = tableTop + headH2 + rows * rowH + footH;
+  const bizTop = tableBottom + 22;
+  const signY = bizTop + bizLines.length * 23 + 40;
+  const H = signY + 44 + PAD;
+
+  const cv = document.createElement("canvas");
+  cv.width = W * S;
+  cv.height = Math.ceil(H) * S;
+  const ctx = cv.getContext("2d");
+  ctx.scale(S, S);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, W, Math.ceil(H));
+  ctx.textBaseline = "middle";
+
+  const put = (str, x, y, font, color, align) => {
+    ctx.font = font;
+    ctx.fillStyle = color || "#111827";
+    ctx.textAlign = align || "left";
+    ctx.fillText(str, x, y);
+  };
+
+  let y = PAD;
+  put(d.shop || "嘉诺汽配", W / 2, y + 16, F(24, 700), "#111827", "center");
+  y += 34;
+  if (d.shopPhone) { put("电话 " + d.shopPhone, W / 2, y + 9, F(12), "#4b5563", "center"); y += 18; }
+  put("送 货 单", W / 2, y + 14, F(17, 700), "#111827", "center");
+  y += 30;
+
+  ctx.strokeStyle = "#111827";
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(PAD, y); ctx.lineTo(W - PAD, y); ctx.stroke();
+  y += 18;
+
+  put("单号：" + (d.no || ""), PAD, y + 8, F(12.5));
+  put("日期：" + (d.date || ""), PAD + 330, y + 8, F(12.5));
+  y += 22;
+  put("客户：" + (d.customer || "—"), PAD, y + 8, F(12.5));
+  put("电话：" + (d.custPhone || "—"), PAD + 330, y + 8, F(12.5));
+
+  // 表格
+  const hline = yy => { ctx.beginPath(); ctx.moveTo(PAD, yy); ctx.lineTo(W - PAD, yy); ctx.stroke(); };
+  const vline = xx => { ctx.beginPath(); ctx.moveTo(xx, tableTop); ctx.lineTo(xx, tableBottom); ctx.stroke(); };
+  ctx.strokeStyle = "#374151";
+  ctx.lineWidth = 1;
+  hline(tableTop);
+  hline(tableTop + headH2);
+  for (let i = 1; i <= rows; i++) hline(tableTop + headH2 + i * rowH);
+  hline(tableBottom);
+  xs.forEach(vline);
+
+  const c0 = (xs[0] + xs[1]) / 2, c2 = (xs[2] + xs[3]) / 2, c3 = (xs[3] + xs[4]) / 2;
+  const headY = tableTop + headH2 / 2;
+  put("序号", c0, headY, F(12.5, 600), "#111827", "center");
+  put("品名 / 规格", xs[1] + 10, headY, F(12.5, 600));
+  put("数量", c2, headY, F(12.5, 600), "#111827", "center");
+  put("单价", c3, headY, F(12.5, 600), "#111827", "center");
+  put("金额", xs[5] - 10, headY, F(12.5, 600), "#111827", "right");
+
+  d.lines.forEach((l, i) => {
+    const cy = tableTop + headH2 + i * rowH + rowH / 2;
+    put(String(i + 1), c0, cy, F(12.5), "#111827", "center");
+    put(cutText(l.product, colName - 22, F(12.5, 600)), xs[1] + 9, l.note ? cy - 7 : cy, F(12.5, 600));
+    if (l.note) put(cutText(l.note, colName - 22, F(11)), xs[1] + 9, cy + 9, F(11), "#4b5563");
+    put(qtyText(l.qty), c2, cy, F(12.5), "#111827", "center");
+    put(money(l.price), xs[4] - 8, cy, F(12.5), "#111827", "right");
+    put(money(l.amount), xs[5] - 10, cy, F(12.5), "#111827", "right");
+  });
+
+  const footY = tableTop + headH2 + rows * rowH + footH / 2;
+  put("金额大写：" + rmbUpper(d.total), xs[0] + 10, footY, F(12.5, 700));
+  put(money(d.total), xs[5] - 10, footY, F(13, 700), "#111827", "right");
+
+  // 业务范围 / 地址 / 电话
+  bizLines.forEach((ln, i) => put(ln, PAD, bizTop + i * 23, bizFont, "#111827"));
+
+  // 签字栏
+  const signW = (inner - 48) / 3;
+  ["送货人签字：" + SLIP_SIGNER, "客户签收", "日期"].forEach((t, i) => {
+    const x0 = PAD + i * (signW + 24);
+    ctx.strokeStyle = "#9ca3af";
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x0, signY); ctx.lineTo(x0 + signW, signY); ctx.stroke();
+    put(t, x0, signY + 16, F(12.5), "#374151");
+  });
+
+  try { return cv.toDataURL("image/png"); } catch (e) { return ""; }
 }
 
 function printStatement(name) {
