@@ -62,18 +62,24 @@
   .toolbar { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; align-items: center; }
   .toolbar input, .toolbar select { padding: 8px 9px; border: 1px solid #d1d5db; border-radius: 7px; font-size: 13px; background: #fff; font-family: inherit; }
   .toolbar input[type=date] { padding: 7px 6px; }
+  .toolbar input[type=checkbox] { padding: 0; border: none; width: 16px; height: 16px; accent-color: #2563eb; }
+  .toolbar .chk-label { display: flex; align-items: center; gap: 5px; font-size: 13px; color: #475569; cursor: pointer; user-select: none; }
   .spacer { flex: 1; }
   .empty-tip { text-align: center; color: #9ca3af; padding: 26px 0; font-size: 13px; }
   .sum-bar { background: #f1f5f9; border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: #334155; }
   .sum-bar b { color: #1e3a5f; }
   .sum-bar .profit { color: #16a34a; font-weight: 700; }
   .prod-title { font-weight: 700; color: #1e3a5f; }
-  .radio-group { display: flex; gap: 8px; }
-  .radio-group label { flex: 1; display: flex; align-items: center; justify-content: center; gap: 5px; padding: 9px 0; border: 1px solid #d1d5db; border-radius: 7px; cursor: pointer; font-size: 13px; margin: 0; font-weight: 500; color: #4b5563; }
-  .radio-group input { display: none; }
-  .radio-group label.checked { border-color: #2563eb; background: #eff6ff; color: #1d4ed8; }
   .muted { color: #9ca3af; }
-  .row-actions { display: flex; gap: 5px; }
+  .row-actions { display: flex; gap: 5px; flex-wrap: wrap; }
+  .sale-line { font-size: 12px; line-height: 1.65; white-space: nowrap; }
+  .sale-line b { color: #1e3a5f; }
+  .batch-info { background: #f1f5f9; border-radius: 8px; padding: 10px 12px; font-size: 13px; line-height: 1.8; color: #334155; }
+  .inner-sales { max-height: 190px; overflow: auto; border: 1px solid #e5e7eb; border-radius: 8px; }
+  .inner-sales table { min-width: 0; }
+  .inner-sales th { position: sticky; top: 0; }
+  #recordsTable { min-width: 920px; }
+  #stockTable { min-width: 700px; }
   @media (max-width: 640px) {
     .form-grid { grid-template-columns: 1fr; }
     .stats-grid { grid-template-columns: repeat(2, 1fr); }
@@ -87,7 +93,7 @@
 <div class="header">
   <div>
     <h1>🚚 嘉诺汽配 · 进销货记录</h1>
-    <div class="sub">一笔一条：进货来源 + 销售去向，库存自动算｜数据存在本机，建议定期导出备份</div>
+    <div class="sub">一条记一批进货：进价、数量、商家；卖多少记多少，库存自动算｜数据存本机，建议定期导出备份</div>
   </div>
   <div class="header-actions">
     <button class="btn btn-outline" onclick="exportData()">导出备份</button>
@@ -108,16 +114,11 @@
   <section id="tab-records">
     <div class="card">
       <div class="toolbar">
-        <button class="btn btn-primary" onclick="openRecordModal()">＋ 记一笔</button>
+        <button class="btn btn-primary" onclick="openRecordModal()">＋ 记一笔进货</button>
         <select id="fProduct" onchange="renderRecords()"><option value="">全部商品</option></select>
         <select id="fCustomer" onchange="renderRecords()"><option value="">全部客户</option></select>
-        <select id="fStatus" onchange="renderRecords()">
-          <option value="">全部状态</option>
-          <option value="sold">已售出</option>
-          <option value="stock">在库</option>
-        </select>
-        <input type="date" id="fFrom" onchange="renderRecords()" title="开始日期">
-        <input type="date" id="fTo" onchange="renderRecords()" title="结束日期">
+        <input type="date" id="fFrom" onchange="renderRecords()" title="进货日期起">
+        <input type="date" id="fTo" onchange="renderRecords()" title="进货日期止">
         <input type="text" id="fKeyword" placeholder="搜商品/商家/客户/备注" oninput="renderRecords()" style="flex:1;min-width:130px">
         <button class="btn btn-outline btn-sm" onclick="clearFilters()">重置</button>
       </div>
@@ -130,7 +131,16 @@
   <section id="tab-stock" style="display:none">
     <div class="card">
       <h2>📦 当前库存（按商品汇总）</h2>
-      <div class="hint" style="margin-bottom:10px">库存 = 标记为"在库"的记录件数；卖出时把那条记录改成"已售出"即可扣减。</div>
+      <div class="hint" style="margin-bottom:10px">库存 = 进货总数 − 已卖出总数。每批货可以分多次卖，卖多少扣多少。</div>
+      <div class="toolbar">
+        <select id="stockProduct" onchange="renderStock()"><option value="">全部商品</option></select>
+        <input type="text" id="stockSearch" placeholder="搜商品名称" oninput="renderStock()" style="flex:1;min-width:130px">
+        <label class="chk-label">
+          <input type="checkbox" id="stockHideEmpty" onchange="renderStock()"> 只看还有货的
+        </label>
+        <button class="btn btn-outline btn-sm" onclick="clearStockFilters()">重置</button>
+      </div>
+      <div id="stockSum"></div>
       <div class="table-wrap"><table id="stockTable"></table></div>
     </div>
   </section>
@@ -173,34 +183,67 @@
 </div>
 
 <script>
-/* ================= 数据层 ================= */
-const KEY = "jnqipei_v2";
+/* ================= 数据层 =================
+   模型：一条记录 = 一批进货
+   { id, date(进货日期), product, qty(进货数量), cost(进货单价), supplier, note,
+     sales: [{ id, date, qty, price, customer }] }
+   库存 = qty - Σsales.qty
+*/
+const KEY = "jnqipei_v3";
+const V2_KEY = "jnqipei_v2";
 const OLD_KEY = "autoPartsStore_v1";
 let db = load();
 
-function load() {
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (raw) return JSON.parse(raw);
-  } catch (e) {}
-  // 首次使用：尝试迁移旧版数据
-  let data = { records: [], customers: [], seq: 1 };
-  try {
-    const oldRaw = localStorage.getItem(OLD_KEY);
-    if (oldRaw) data = migrateOld(JSON.parse(oldRaw));
-  } catch (e) {}
-  localStorage.setItem(KEY, JSON.stringify(data));
-  return data;
-}
-function save() { localStorage.setItem(KEY, JSON.stringify(db)); }
-function nextId() { return db.seq++; }
-function today() { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
-function money(n) { return "¥" + (Number(n) || 0).toFixed(2); }
-function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+function blankDB() { return { records: [], customers: [], seq: 1 }; }
 
-/* 旧版数据迁移：进货批次与销售按 FIFO 配对成一条记录 */
+function maxSeq(d) {
+  let m = 0;
+  (d.records || []).forEach(r => {
+    m = Math.max(m, Number(r.id) || 0);
+    (r.sales || []).forEach(s => { m = Math.max(m, Number(s.id) || 0); });
+  });
+  (d.customers || []).forEach(c => { m = Math.max(m, Number(c.id) || 0); });
+  return m + 1;
+}
+
+function normalize(d) {
+  const out = blankDB();
+  out.records = (d.records || []).map(r => ({
+    id: r.id, date: r.date || "", product: r.product || "",
+    qty: Number(r.qty) || 0, cost: Number(r.cost) || 0,
+    supplier: r.supplier || "", note: r.note || "",
+    sales: (r.sales || []).map(s => ({
+      id: s.id, date: s.date || r.date || "", qty: Number(s.qty) || 0,
+      price: Number(s.price) || 0, customer: s.customer || ""
+    }))
+  }));
+  out.customers = (d.customers || []).map(c => ({ id: c.id, name: c.name, phone: c.phone || "", note: c.note || "" }));
+  out.seq = Math.max(Number(d.seq) || 1, maxSeq(out));
+  return out;
+}
+
+/* v2（有 status 的旧版）升级：已售出的转成一条全额销售明细 */
+function upgradeV2(d) {
+  const out = blankDB();
+  out.customers = (d.customers || []).map(c => ({ id: c.id, name: c.name, phone: c.phone || "", note: c.note || "" }));
+  out.records = (d.records || []).map((r, i) => {
+    const qty = Number(r.qty) || 0;
+    const sales = [];
+    if (r.status === "sold" && qty > 0) {
+      sales.push({ id: 100000 + i, date: r.date || "", qty: qty, price: Number(r.price) || 0, customer: r.customer || "" });
+    }
+    return {
+      id: r.id, date: r.date || "", product: r.product || "", qty: qty,
+      cost: Number(r.cost) || 0, supplier: r.supplier || "", note: r.note || "", sales: sales
+    };
+  });
+  out.seq = maxSeq(out);
+  return out;
+}
+
+/* v1（最早的进货/销售分表）迁移：进货成批，销售按 FIFO 分到各批次里 */
 function migrateOld(old) {
-  const data = { records: [], customers: [], seq: 1 };
+  const data = blankDB();
   const partName = id => { const p = (old.parts || []).find(x => x.id === id); return p ? p.name + (p.spec ? "（" + p.spec + "）" : "") : "未知配件"; };
   const supName = id => { const s = (old.suppliers || []).find(x => x.id === id); return s ? s.name : ""; };
   const cusName = id => { const c = (old.customers || []).find(x => x.id === id); return c ? c.name : ""; };
@@ -208,58 +251,111 @@ function migrateOld(old) {
   (old.customers || []).forEach(c => data.customers.push({ id: data.seq++, name: c.name, phone: c.phone || "", note: c.note || "" }));
 
   const lots = (old.purchases || []).slice().sort((a, b) => String(a.date).localeCompare(String(b.date))).map(p => ({
-    partId: p.partId, date: p.date, remain: Number(p.qty), cost: Number(p.price), supplier: supName(p.supplierId), note: p.note || ""
+    id: data.seq++, date: p.date, product: partName(p.partId),
+    qty: Number(p.qty) || 0, cost: Number(p.price) || 0, supplier: supName(p.supplierId),
+    note: p.note || "", remain: Number(p.qty) || 0, sales: []
   }));
 
-  const sales = (old.sales || []).slice().sort((a, b) => String(a.date).localeCompare(String(b.date)));
-  sales.forEach(s => {
-    let need = Number(s.qty);
-    const date = s.date, product = partName(s.partId), customer = cusName(s.customerId);
+  (old.sales || []).slice().sort((a, b) => String(a.date).localeCompare(String(b.date))).forEach(s => {
+    let need = Number(s.qty) || 0;
+    const pname = partName(s.partId);
     for (const lot of lots) {
       if (need <= 0) break;
-      if (lot.partId !== s.partId || lot.remain <= 0) continue;
+      if (lot.product !== pname || lot.remain <= 0) continue;
       const use = Math.min(need, lot.remain);
       lot.remain -= use; need -= use;
-      data.records.push({ id: data.seq++, date, product, qty: use, cost: lot.cost, supplier: lot.supplier, customer, price: Number(s.price), status: "sold", note: s.note || "" });
+      lot.sales.push({ id: data.seq++, date: s.date, qty: use, price: Number(s.price) || 0, customer: cusName(s.customerId) });
     }
     if (need > 0) {
-      data.records.push({ id: data.seq++, date, product, qty: need, cost: 0, supplier: "", customer, price: Number(s.price), status: "sold", note: ((s.note || "") + "（原进货记录缺失）").trim() });
+      lots.push({
+        id: data.seq++, date: s.date, product: pname, qty: need, cost: 0, supplier: "",
+        note: "（原进货记录缺失）", remain: 0,
+        sales: [{ id: data.seq++, date: s.date, qty: need, price: Number(s.price) || 0, customer: cusName(s.customerId) }]
+      });
     }
   });
 
-  lots.forEach(lot => {
-    if (lot.remain > 0) {
-      data.records.push({ id: data.seq++, date: lot.date, product: partName(lot.partId), qty: lot.remain, cost: lot.cost, supplier: lot.supplier, customer: "", price: 0, status: "stock", note: lot.note });
-    }
-  });
+  lots.forEach(l => { delete l.remain; data.records.push(l); });
+  data.seq = maxSeq(data);
   return data;
 }
 
+function load() {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (raw) return normalize(JSON.parse(raw));
+  } catch (e) {}
+  let data = null;
+  try {
+    const raw2 = localStorage.getItem(V2_KEY);
+    if (raw2) data = upgradeV2(JSON.parse(raw2));
+  } catch (e) {}
+  if (!data) {
+    try {
+      const raw1 = localStorage.getItem(OLD_KEY);
+      if (raw1) data = migrateOld(JSON.parse(raw1));
+    } catch (e) {}
+  }
+  if (!data) data = blankDB();
+  localStorage.setItem(KEY, JSON.stringify(data));
+  return data;
+}
+function save() { localStorage.setItem(KEY, JSON.stringify(db)); }
+function nextId() { return db.seq++; }
+function today() { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
+function money(n) { return "¥" + (Number(n) || 0).toFixed(2); }
+function qtyText(n) { return String(Math.round((Number(n) || 0) * 100) / 100); }
+function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
 /* ================= 计算 ================= */
+function soldQtyOf(r) { return (r.sales || []).reduce((s, x) => s + (Number(x.qty) || 0), 0); }
+function stockOf(r) { return (Number(r.qty) || 0) - soldQtyOf(r); }
+function soldAmtOf(r) { return (r.sales || []).reduce((s, x) => s + (Number(x.qty) || 0) * (Number(x.price) || 0), 0); }
+function profitOf(r) { return soldAmtOf(r) - soldQtyOf(r) * (Number(r.cost) || 0); }
+
 function allRecords() { return db.records.slice().sort((a, b) => String(b.date).localeCompare(String(a.date)) || b.id - a.id); }
 function productsInUse() { return [...new Set(db.records.map(r => r.product).filter(Boolean))].sort(); }
-function customersInUse() {
-  const names = [...new Set(db.records.map(r => r.customer).filter(Boolean).concat(db.customers.map(c => c.name)))];
-  return names.sort();
-}
 function suppliersInUse() { return [...new Set(db.records.map(r => r.supplier).filter(Boolean))].sort(); }
+function customersInUse() {
+  const names = [];
+  db.records.forEach(r => (r.sales || []).forEach(s => { if (s.customer) names.push(s.customer); }));
+  db.customers.forEach(c => { if (c.name) names.push(c.name); });
+  return [...new Set(names)].sort();
+}
 
 function productStats(filter) {
   const map = {};
   db.records.forEach(r => {
     if (!r.product) return;
     if (filter && r.product !== filter) return;
-    const s = map[r.product] || (map[r.product] = { product: r.product, inQty: 0, inValue: 0, soldQty: 0, soldValue: 0, stockQty: 0, stockValue: 0, profit: 0 });
-    const qty = Number(r.qty) || 0, cost = Number(r.cost) || 0, price = Number(r.price) || 0;
+    const s = map[r.product] || (map[r.product] = {
+      product: r.product, batches: 0, inQty: 0, inValue: 0, soldQty: 0, soldValue: 0,
+      stockQty: 0, stockValue: 0, profit: 0, lastSale: ""
+    });
+    const qty = Number(r.qty) || 0, cost = Number(r.cost) || 0;
+    const sq = soldQtyOf(r), sa = soldAmtOf(r);
+    s.batches += 1;
     s.inQty += qty; s.inValue += qty * cost;
-    if (r.status === "sold") { s.soldQty += qty; s.soldValue += qty * price; s.profit += qty * (price - cost); }
-    else { s.stockQty += qty; s.stockValue += qty * cost; }
+    s.soldQty += sq; s.soldValue += sa; s.profit += sa - sq * cost;
+    s.stockQty += qty - sq; s.stockValue += (qty - sq) * cost;
+    (r.sales || []).forEach(x => { if (x.date && x.date > s.lastSale) s.lastSale = x.date; });
   });
   return Object.values(map);
 }
-function recordProfit(r) {
-  if (r.status !== "sold") return 0;
-  return (Number(r.qty) || 0) * ((Number(r.price) || 0) - (Number(r.cost) || 0));
+
+function customerStats() {
+  const map = {};
+  const ensure = name => map[name] || (map[name] = { name, count: 0, qty: 0, amt: 0, profit: 0, last: "" });
+  db.records.forEach(r => (r.sales || []).forEach(s => {
+    const o = ensure(s.customer || "（未填客户）");
+    o.count += 1;
+    o.qty += Number(s.qty) || 0;
+    o.amt += (Number(s.qty) || 0) * (Number(s.price) || 0);
+    o.profit += (Number(s.qty) || 0) * ((Number(s.price) || 0) - (Number(r.cost) || 0));
+    if (s.date && s.date > o.last) o.last = s.date;
+  }));
+  db.customers.forEach(c => { if (c.name) ensure(c.name); });
+  return Object.values(map);
 }
 
 /* ================= 标签页 ================= */
@@ -286,7 +382,6 @@ function currentFilters() {
   return {
     product: document.getElementById("fProduct").value,
     customer: document.getElementById("fCustomer").value,
-    status: document.getElementById("fStatus").value,
     from: document.getElementById("fFrom").value,
     to: document.getElementById("fTo").value,
     kw: (document.getElementById("fKeyword").value || "").toLowerCase()
@@ -296,17 +391,26 @@ function filteredRecords() {
   const f = currentFilters();
   return allRecords().filter(r => {
     if (f.product && r.product !== f.product) return false;
-    if (f.customer && r.customer !== f.customer) return false;
-    if (f.status && r.status !== f.status) return false;
+    if (f.customer && !(r.sales || []).some(s => s.customer === f.customer)) return false;
     if (f.from && String(r.date) < f.from) return false;
     if (f.to && String(r.date) > f.to) return false;
     if (f.kw) {
-      const hay = (r.product + " " + (r.supplier || "") + " " + (r.customer || "") + " " + (r.note || "")).toLowerCase();
+      const hay = (r.product + " " + (r.supplier || "") + " " + (r.note || "") + " " +
+        (r.sales || []).map(s => s.customer || "").join(" ")).toLowerCase();
       if (!hay.includes(f.kw)) return false;
     }
     return true;
   });
 }
+
+function salesCell(r) {
+  const list = r.sales || [];
+  if (!list.length) return '<span class="muted">未售出</span>';
+  return list.slice().sort((a, b) => String(a.date).localeCompare(String(b.date))).map(s =>
+    `<div class="sale-line">${esc(s.customer || "未填客户")} <b>${qtyText(s.qty)}</b>件 × ${money(s.price)} <span class="muted">${esc(s.date || "")}</span></div>`
+  ).join("");
+}
+
 function renderRecords() {
   initFilters();
   const list = filteredRecords();
@@ -314,65 +418,119 @@ function renderRecords() {
 
   const inQty = list.reduce((s, r) => s + (Number(r.qty) || 0), 0);
   const inAmt = list.reduce((s, r) => s + (Number(r.qty) || 0) * (Number(r.cost) || 0), 0);
-  const sold = list.filter(r => r.status === "sold");
-  const soldQty = sold.reduce((s, r) => s + (Number(r.qty) || 0), 0);
-  const soldAmt = sold.reduce((s, r) => s + (Number(r.qty) || 0) * (Number(r.price) || 0), 0);
-  const profit = sold.reduce((s, r) => s + recordProfit(r), 0);
+  const soldQty = list.reduce((s, r) => s + soldQtyOf(r), 0);
+  const soldAmt = list.reduce((s, r) => s + soldAmtOf(r), 0);
+  const stockQty = list.reduce((s, r) => s + stockOf(r), 0);
+  const profit = list.reduce((s, r) => s + profitOf(r), 0);
   const head = f.product ? `<span class="prod-title">【${esc(f.product)}】</span>` : "";
+
   document.getElementById("sumBar").innerHTML = `<div class="sum-bar">
-    ${head}<span>共 <b>${list.length}</b> 条</span>
-    <span>进货 <b>${inQty}</b> 件 / ${money(inAmt)}</span>
-    <span>售出 <b>${soldQty}</b> 件 / ${money(soldAmt)}</span>
+    ${head}<span>共 <b>${list.length}</b> 批</span>
+    <span>进货 <b>${qtyText(inQty)}</b> 件 / ${money(inAmt)}</span>
+    <span>卖出 <b>${qtyText(soldQty)}</b> 件 / ${money(soldAmt)}</span>
+    <span>在库 <b>${qtyText(stockQty)}</b> 件</span>
     <span>毛利 <span class="profit">${money(profit)}</span></span>
   </div>`;
 
   document.getElementById("recordsTable").innerHTML = list.length ? `
     <thead><tr>
-      <th>日期</th><th>商品</th><th class="num">数量</th>
-      <th>进货商家</th><th class="num">进价</th>
-      <th>客户</th><th class="num">售价</th><th class="num">毛利</th><th>状态</th><th>操作</th>
+      <th>进货日期</th><th>商品</th><th>进货商家</th><th class="num">进价</th>
+      <th class="num">进货数</th><th class="num">已卖</th><th class="num">在库</th>
+      <th>卖出明细（客户 / 售价）</th><th class="num">毛利</th><th>操作</th>
     </tr></thead>
     <tbody>
     ${list.map(r => {
-      const p = recordProfit(r);
+      const sq = soldQtyOf(r), st = stockOf(r), pf = profitOf(r);
       return `<tr>
         <td>${esc(r.date)}</td>
         <td><b>${esc(r.product)}</b>${r.note ? `<div class="hint" style="margin-top:2px">${esc(r.note)}</div>` : ""}</td>
-        <td class="num">${r.qty}</td>
         <td>${esc(r.supplier || "-")}</td>
         <td class="num">${money(r.cost)}</td>
-        <td>${esc(r.customer || "-")}</td>
-        <td class="num">${r.status === "sold" ? money(r.price) : '<span class="muted">-</span>'}</td>
-        <td class="num" style="color:${r.status === "sold" ? (p >= 0 ? "#16a34a" : "#dc2626") : "#9ca3af"};font-weight:600">${r.status === "sold" ? money(p) : "-"}</td>
-        <td>${r.status === "sold" ? '<span class="tag tag-sold">已售出</span>' : '<span class="tag tag-stock">在库</span>'}</td>
+        <td class="num">${qtyText(r.qty)}</td>
+        <td class="num">${sq ? qtyText(sq) : '<span class="muted">0</span>'}</td>
+        <td class="num" style="font-weight:700;color:${st > 0 ? "#1e3a5f" : "#9ca3af"}">${qtyText(st)}</td>
+        <td>${salesCell(r)}</td>
+        <td class="num" style="color:${pf >= 0 ? "#16a34a" : "#dc2626"};font-weight:600">${sq ? money(pf) : "-"}</td>
         <td><div class="row-actions">
+          ${st > 0 ? `<button class="btn btn-success btn-sm" onclick="openSellModal(${r.id})">卖</button>` : ""}
           <button class="btn btn-outline btn-sm" onclick="openRecordModal(${r.id})">改</button>
           <button class="btn btn-danger btn-sm" onclick="delRecord(${r.id})">删</button>
         </div></td>
       </tr>`;
     }).join("")}
-    </tbody>` : `<tbody><tr><td colspan="10"><div class="empty-tip">还没有记录，点「＋ 记一笔」开始</div></td></tr></tbody>`;
+    </tbody>` : `<tbody><tr><td colspan="10"><div class="empty-tip">还没有记录，点「＋ 记一笔进货」开始</div></td></tr></tbody>`;
 }
 
 function clearFilters() {
-  ["fProduct", "fCustomer", "fStatus", "fFrom", "fTo", "fKeyword"].forEach(id => document.getElementById(id).value = "");
+  ["fProduct", "fCustomer", "fFrom", "fTo", "fKeyword"].forEach(id => document.getElementById(id).value = "");
   renderRecords();
 }
 
 /* ================= 渲染：库存 ================= */
+function fillStockSelect() {
+  const sel = document.getElementById("stockProduct");
+  if (!sel) return;
+  const cur = sel.value;
+  const rows = productStats().filter(s => s.inQty > 0)
+    .sort((a, b) => b.stockQty - a.stockQty || a.product.localeCompare(b.product, "zh"));
+  sel.innerHTML = '<option value="">全部商品</option>' + rows.map(s =>
+    `<option value="${esc(s.product)}">${esc(s.product)}（剩 ${qtyText(s.stockQty)}）</option>`).join("");
+  sel.value = [...sel.options].some(o => o.value === cur) ? cur : "";
+}
+
 function renderStock() {
-  const stats = productStats().filter(s => s.inQty > 0);
-  document.getElementById("stockTable").innerHTML = stats.length ? `
-    <thead><tr><th>商品</th><th class="num">在库件数</th><th class="num">进货均价</th><th class="num">库存成本</th><th class="num">累计进货</th><th class="num">已售出</th><th>操作</th></tr></thead>
-    <tbody>${stats.sort((a, b) => b.stockQty - a.stockQty).map(s => `<tr>
-      <td><b>${esc(s.product)}</b></td>
-      <td class="num"><b>${s.stockQty}</b></td>
+  const sel = document.getElementById("stockProduct");
+  fillStockSelect();
+  const kw = (document.getElementById("stockSearch").value || "").toLowerCase().trim();
+  const hideEmpty = document.getElementById("stockHideEmpty").checked;
+
+  let stats = productStats().filter(s => s.inQty > 0);
+  const allCount = stats.length;
+  if (sel.value) stats = stats.filter(s => s.product === sel.value);
+  if (kw) stats = stats.filter(s => s.product.toLowerCase().includes(kw));
+  if (hideEmpty) stats = stats.filter(s => s.stockQty > 0);
+  stats.sort((a, b) => b.stockQty - a.stockQty || a.product.localeCompare(b.product, "zh"));
+
+  const tQty = stats.reduce((s, x) => s + x.stockQty, 0);
+  const tVal = stats.reduce((s, x) => s + x.stockValue, 0);
+  const tSold = stats.reduce((s, x) => s + x.soldQty, 0);
+  const head = sel.value ? `<span class="prod-title">【${esc(sel.value)}】</span>` : "";
+
+  document.getElementById("stockSum").innerHTML = `<div class="sum-bar">
+    ${head}<span>商品 <b>${stats.length}</b>${stats.length !== allCount ? ` / ${allCount}` : ""} 种</span>
+    <span>在库合计 <b>${qtyText(tQty)}</b> 件</span>
+    <span>库存成本 <b>${money(tVal)}</b></span>
+    <span>已卖出 <b>${qtyText(tSold)}</b> 件</span>
+  </div>`;
+
+  if (!stats.length) {
+    const msg = (sel.value || kw) ? `没有符合条件的商品${sel.value ? `（${esc(sel.value)} 已无进货记录）` : ""}`
+      : (hideEmpty ? "当前所有商品都已卖完，取消勾选「只看还有货的」可以查看历史商品" : "暂无库存数据");
+    document.getElementById("stockTable").innerHTML = `<tbody><tr><td colspan="7"><div class="empty-tip">${msg}</div></td></tr></tbody>`;
+    return;
+  }
+
+  document.getElementById("stockTable").innerHTML = `
+    <thead><tr><th>商品</th><th class="num">在库件数</th><th class="num">进货均价</th><th class="num">库存成本</th><th class="num">累计进货</th><th class="num">已卖出</th><th>操作</th></tr></thead>
+    <tbody>${stats.map(s => `<tr>
+      <td><b>${esc(s.product)}</b><div class="hint">${s.batches} 批${s.stockQty <= 0 ? " · 已卖完" : ""}</div></td>
+      <td class="num"><b style="color:${s.stockQty > 0 ? "#1e3a5f" : "#9ca3af"}">${qtyText(s.stockQty)}</b></td>
       <td class="num">${money(s.inQty ? s.inValue / s.inQty : 0)}</td>
       <td class="num">${money(s.stockValue)}</td>
-      <td class="num">${s.inQty} 件</td>
-      <td class="num">${s.soldQty} 件</td>
-      <td><button class="btn btn-outline btn-sm" data-product="${esc(s.product)}" onclick="showProductRecords(this.dataset.product)">看记录</button></td>
-    </tr>`).join("")}</tbody>` : `<tbody><tr><td colspan="7"><div class="empty-tip">暂无库存数据</div></td></tr></tbody>`;
+      <td class="num">${qtyText(s.inQty)} 件</td>
+      <td class="num">${qtyText(s.soldQty)} 件</td>
+      <td><div class="row-actions">
+        ${s.stockQty > 0 ? `<button class="btn btn-success btn-sm" data-product="${esc(s.product)}" onclick="sellProduct(this.dataset.product)">卖</button>` : ""}
+        <button class="btn btn-outline btn-sm" data-product="${esc(s.product)}" onclick="showProductRecords(this.dataset.product)">看记录</button>
+      </div></td>
+    </tr>`).join("")}</tbody>`;
+}
+
+function clearStockFilters() {
+  document.getElementById("stockProduct").value = "";
+  document.getElementById("stockSearch").value = "";
+  document.getElementById("stockHideEmpty").checked = false;
+  renderStock();
 }
 
 function showProductRecords(product) {
@@ -389,81 +547,84 @@ function showCustomerRecords(name) {
   renderRecords();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
+function sellProduct(product) {
+  const batch = allRecords().slice().reverse().find(r => r.product === product && stockOf(r) > 0);
+  if (!batch) { alert("该商品已无库存，先记一笔进货吧"); return; }
+  openSellModal(batch.id);
+}
 
 /* ================= 渲染：客户记录 ================= */
 function renderCustomers() {
   const kw = (document.getElementById("custSearch").value || "").toLowerCase();
-  let list = db.customers;
-  if (kw) list = list.filter(c => (c.name + (c.phone || "")).toLowerCase().includes(kw));
-  const rows = list.map(c => {
-    const recs = db.records.filter(r => r.customer === c.name && r.status === "sold");
-    const amt = recs.reduce((s, r) => s + (Number(r.qty) || 0) * (Number(r.price) || 0), 0);
-    const qty = recs.reduce((s, r) => s + (Number(r.qty) || 0), 0);
-    const last = recs.map(r => r.date).sort().pop();
-    return { c, count: recs.length, qty, amt, last };
-  }).sort((a, b) => b.amt - a.amt);
+  const info = {};
+  db.customers.forEach(c => { info[c.name] = c; });
+
+  let rows = customerStats();
+  if (kw) rows = rows.filter(o => (o.name + ((info[o.name] && info[o.name].phone) || "")).toLowerCase().includes(kw));
+  rows.sort((a, b) => b.amt - a.amt);
 
   document.getElementById("customersTable").innerHTML = rows.length ? `
     <thead><tr><th>客户名称</th><th>电话</th><th class="num">购买笔数</th><th class="num">累计件数</th><th class="num">累计金额</th><th>最近购买</th><th>备注</th><th>操作</th></tr></thead>
-    <tbody>${rows.map(o => `<tr>
-      <td><b>${esc(o.c.name)}</b></td>
-      <td>${esc(o.c.phone || "-")}</td>
-      <td class="num">${o.count}</td>
-      <td class="num">${o.qty}</td>
-      <td class="num"><b>${money(o.amt)}</b></td>
-      <td>${o.last ? esc(o.last) : "-"}</td>
-      <td>${esc(o.c.note || "-")}</td>
-      <td><div class="row-actions">
-        <button class="btn btn-outline btn-sm" data-customer="${esc(o.c.name)}" onclick="showCustomerRecords(this.dataset.customer)">看记录</button>
-        <button class="btn btn-outline btn-sm" onclick="openCustomerModal(${o.c.id})">改</button>
-        <button class="btn btn-danger btn-sm" onclick="delCustomer(${o.c.id})">删</button>
-      </div></td>
-    </tr>`).join("")}</tbody>` : `<tbody><tr><td colspan="8"><div class="empty-tip">还没有客户，点「＋ 新增客户」添加</div></td></tr></tbody>`;
+    <tbody>${rows.map(o => {
+      const c = info[o.name] || {};
+      return `<tr>
+        <td><b>${esc(o.name)}</b></td>
+        <td>${esc(c.phone || "-")}</td>
+        <td class="num">${o.count}</td>
+        <td class="num">${qtyText(o.qty)}</td>
+        <td class="num"><b>${money(o.amt)}</b></td>
+        <td>${o.last ? esc(o.last) : "-"}</td>
+        <td>${esc(c.note || "-")}</td>
+        <td><div class="row-actions">
+          <button class="btn btn-outline btn-sm" data-customer="${esc(o.name)}" onclick="showCustomerRecords(this.dataset.customer)">看记录</button>
+          <button class="btn btn-outline btn-sm" onclick="openCustomerModal(${c.id || "null"}, '${esc(o.name).replace(/'/g, "&#39;")}')">改</button>
+          ${c.id ? `<button class="btn btn-danger btn-sm" onclick="delCustomer(${c.id})">删</button>` : ""}
+        </div></td>
+      </tr>`;
+    }).join("")}</tbody>` : `<tbody><tr><td colspan="8"><div class="empty-tip">还没有客户，卖货时填了客户名就会自动出现在这里</div></td></tr></tbody>`;
 }
 
 /* ================= 渲染：汇总 ================= */
 function renderDash() {
   const all = db.records;
-  const inAmt = all.reduce((s, r) => s + (Number(r.qty) || 0) * (Number(r.cost) || 0), 0);
   const inQty = all.reduce((s, r) => s + (Number(r.qty) || 0), 0);
-  const sold = all.filter(r => r.status === "sold");
-  const soldAmt = sold.reduce((s, r) => s + (Number(r.qty) || 0) * (Number(r.price) || 0), 0);
-  const soldQty = sold.reduce((s, r) => s + (Number(r.qty) || 0), 0);
-  const profit = sold.reduce((s, r) => s + recordProfit(r), 0);
-  const stockRecs = all.filter(r => r.status === "stock");
-  const stockQty = stockRecs.reduce((s, r) => s + (Number(r.qty) || 0), 0);
-  const stockValue = stockRecs.reduce((s, r) => s + (Number(r.qty) || 0) * (Number(r.cost) || 0), 0);
+  const inAmt = all.reduce((s, r) => s + (Number(r.qty) || 0) * (Number(r.cost) || 0), 0);
+  const soldQty = all.reduce((s, r) => s + soldQtyOf(r), 0);
+  const soldAmt = all.reduce((s, r) => s + soldAmtOf(r), 0);
+  const profit = all.reduce((s, r) => s + profitOf(r), 0);
+  const stockQty = all.reduce((s, r) => s + stockOf(r), 0);
+  const stockValue = all.reduce((s, r) => s + stockOf(r) * (Number(r.cost) || 0), 0);
 
   document.getElementById("statsGrid").innerHTML = [
-    ["累计进货", inQty + " 件 / " + money(inAmt), ""],
-    ["累计销售", soldQty + " 件 / " + money(soldAmt), "green"],
+    ["累计进货", qtyText(inQty) + " 件 / " + money(inAmt), ""],
+    ["累计销售", qtyText(soldQty) + " 件 / " + money(soldAmt), "green"],
     ["累计毛利", money(profit), profit >= 0 ? "green" : "red"],
-    ["在库库存", stockQty + " 件", ""],
+    ["在库库存", qtyText(stockQty) + " 件", ""],
     ["库存成本", money(stockValue), ""],
     ["毛利率", soldAmt > 0 ? ((profit / soldAmt) * 100).toFixed(1) + "%" : "-", ""]
   ].map(([l, v, c]) => `<div class="stat"><div class="label">${l}</div><div class="value ${c}">${v}</div></div>`).join("");
 
   const stats = productStats().sort((a, b) => b.profit - a.profit);
   document.getElementById("productTable").innerHTML = stats.length ? `
-    <thead><tr><th>商品</th><th class="num">进货件数</th><th class="num">进货均价</th><th class="num">售出件数</th><th class="num">销售均价</th><th class="num">毛利</th><th class="num">在库</th><th></th></tr></thead>
+    <thead><tr><th>商品</th><th class="num">进货件数</th><th class="num">进货均价</th><th class="num">卖出件数</th><th class="num">销售均价</th><th class="num">在库</th><th class="num">毛利</th><th></th></tr></thead>
     <tbody>${stats.map(s => `<tr>
       <td><b>${esc(s.product)}</b></td>
-      <td class="num">${s.inQty}</td>
+      <td class="num">${qtyText(s.inQty)}</td>
       <td class="num">${money(s.inQty ? s.inValue / s.inQty : 0)}</td>
-      <td class="num">${s.soldQty}</td>
+      <td class="num">${qtyText(s.soldQty)}</td>
       <td class="num">${money(s.soldQty ? s.soldValue / s.soldQty : 0)}</td>
+      <td class="num">${qtyText(s.stockQty)}</td>
       <td class="num" style="color:${s.profit >= 0 ? "#16a34a" : "#dc2626"};font-weight:600">${money(s.profit)}</td>
-      <td class="num">${s.stockQty}</td>
       <td><button class="btn btn-outline btn-sm" data-product="${esc(s.product)}" onclick="showProductRecords(this.dataset.product)">看记录</button></td>
     </tr>`).join("")}</tbody>` : `<tbody><tr><td colspan="8"><div class="empty-tip">暂无数据</div></td></tr></tbody>`;
 
-  const alerts = stats.filter(s => s.stockQty < 2);
+  const alerts = stats.filter(s => s.inQty > 0 && s.stockQty < 2);
   document.getElementById("alertTable").innerHTML = alerts.length ? `
     <thead><tr><th>商品</th><th class="num">在库</th><th>状态</th><th></th></tr></thead>
     <tbody>${alerts.map(s => `<tr>
       <td><b>${esc(s.product)}</b></td>
-      <td class="num">${s.stockQty}</td>
-      <td>${s.stockQty <= 0 ? '<span class="tag tag-out">已售完</span>' : '<span class="tag tag-low">库存偏低</span>'}</td>
+      <td class="num">${qtyText(s.stockQty)}</td>
+      <td>${s.stockQty <= 0 ? '<span class="tag tag-out">已卖完</span>' : '<span class="tag tag-low">库存偏低</span>'}</td>
       <td><button class="btn btn-outline btn-sm" data-product="${esc(s.product)}" onclick="showProductRecords(this.dataset.product)">看记录</button></td>
     </tr>`).join("")}</tbody>` : `<tbody><tr><td colspan="4"><div class="empty-tip">👍 暂无提醒</div></td></tr></tbody>`;
 }
@@ -483,119 +644,159 @@ function closeModal() { document.getElementById("modalMask").classList.remove("s
 document.getElementById("modalMask").addEventListener("click", e => { if (e.target === e.currentTarget) closeModal(); });
 function val(id) { const el = document.getElementById(id); return el ? (el.value || "").trim() : ""; }
 function numv(id) { const el = document.getElementById(id); const v = el ? parseFloat(el.value) : NaN; return isNaN(v) ? 0 : v; }
+function ensureCustomer(name) {
+  if (!name) return;
+  if (!db.customers.some(c => c.name === name)) db.customers.push({ id: nextId(), name: name, phone: "", note: "" });
+}
 
-/* ================= 记录弹窗 ================= */
+/* ================= 弹窗：记一笔进货 ================= */
 function openRecordModal(id) {
-  const r = db.records.find(x => x.id === id) || { date: today(), status: "sold", qty: 1 };
+  const r = db.records.find(x => x.id === id) || { date: today(), qty: 1, sales: [] };
+  const sold = soldQtyOf(r);
   const prodOpts = productsInUse().map(p => `<option value="${esc(p)}">`).join("");
   const supOpts = suppliersInUse().map(s => `<option value="${esc(s)}">`).join("");
-  const cusOpts = customersInUse().map(c => `<option value="${esc(c)}">`).join("");
+  const lastCost = (r.cost !== undefined && r.cost !== null && r.cost !== "") ? r.cost
+    : ((db.records.filter(x => x.product === r.product).slice(-1)[0] || {}).cost || "");
 
-  showModal(id ? "修改记录" : "记一笔进销货", `
-    <div class="form-row"><label>日期 *</label><input type="date" id="r-date" value="${esc(r.date || today())}"></div>
+  showModal(id ? "修改这批进货" : "记一笔进货", `
+    <div class="form-row"><label>进货日期 *</label><input type="date" id="r-date" value="${esc(r.date || today())}"></div>
     <div class="form-row"><label>商品名称 *</label>
       <input id="r-product" list="dl-product" value="${esc(r.product || "")}" placeholder="如：机油滤芯（大众朗逸）">
       <datalist id="dl-product">${prodOpts}</datalist>
     </div>
     <div class="form-grid">
-      <div class="form-row"><label>数量 *</label><input type="number" id="r-qty" min="0.01" step="1" value="${r.qty || 1}"></div>
-      <div class="form-row"><label>进货单价（¥）</label><input type="number" id="r-cost" min="0" step="0.01" value="${r.cost != null ? r.cost : ""}" placeholder="0.00"></div>
+      <div class="form-row"><label>进货数量 *</label><input type="number" id="r-qty" min="1" step="1" value="${r.qty || 1}"></div>
+      <div class="form-row"><label>进货单价（¥/件）</label><input type="number" id="r-cost" min="0" step="0.01" value="${r.cost != null && r.cost !== "" ? r.cost : (lastCost || "")}" placeholder="0.00"></div>
     </div>
     <div class="form-row"><label>进货商家（从哪里进的）</label>
       <input id="r-supplier" list="dl-supplier" value="${esc(r.supplier || "")}" placeholder="商家名称">
       <datalist id="dl-supplier">${supOpts}</datalist>
     </div>
-    <div class="form-row"><label>状态</label>
-      <div class="radio-group">
-        <label id="lbl-sold" class="${r.status === "sold" ? "checked" : ""}"><input type="radio" name="status" value="sold" ${r.status === "sold" ? "checked" : ""} onchange="toggleSaleFields()">已售出</label>
-        <label id="lbl-stock" class="${r.status !== "sold" ? "checked" : ""}"><input type="radio" name="status" value="stock" ${r.status !== "sold" ? "checked" : ""} onchange="toggleSaleFields()">在库（还没卖）</label>
-      </div>
-    </div>
-    <div id="saleBox">
-      <div class="form-row"><label>客户（卖给了谁）</label>
-        <input id="r-customer" list="dl-customer" value="${esc(r.customer || "")}" placeholder="客户名称">
-        <datalist id="dl-customer">${cusOpts}</datalist>
-      </div>
-      <div class="form-row"><label>销售单价（¥）</label><input type="number" id="r-price" min="0" step="0.01" value="${r.price ? r.price : ""}" placeholder="0.00">
-        <div class="hint" id="profitHint"></div>
-      </div>
-    </div>
     <div class="form-row"><label>备注</label><input id="r-note" value="${esc(r.note || "")}" placeholder="如：运费、批次、适配车型"></div>
+    <div class="hint" id="recordHint">${id && sold > 0 ? `这批已经卖出 ${qtyText(sold)} 件，进货数量不能改到比它小。` : "记好之后，卖出去的时候点「卖」，卖多少扣多少库存。"}</div>
   `, () => {
     const product = val("r-product"), qty = numv("r-qty");
-    const status = document.querySelector('input[name=status]:checked').value;
-    if (!val("r-date")) { alert("请选择日期"); return false; }
+    if (!val("r-date")) { alert("请选择进货日期"); return false; }
     if (!product) { alert("请填写商品名称"); return false; }
-    if (!(qty > 0)) { alert("请填写正确数量"); return false; }
-    const customer = val("r-customer"), price = numv("r-price");
-    if (status === "sold" && !customer) { alert("已售出的记录请填写客户"); return false; }
+    if (!(qty > 0)) { alert("请填写正确的进货数量"); return false; }
+    if (id && qty < sold) { alert(`这批已经卖出 ${qtyText(sold)} 件，进货数量不能小于 ${qtyText(sold)}`); return false; }
 
     const rec = {
-      date: val("r-date"), product, qty,
-      cost: numv("r-cost"), supplier: val("r-supplier"),
-      status, customer: status === "sold" ? customer : "", price: status === "sold" ? price : 0,
-      note: val("r-note")
+      date: val("r-date"), product: product, qty: qty,
+      cost: numv("r-cost"), supplier: val("r-supplier"), note: val("r-note")
     };
-    if (id) Object.assign(r, rec); else db.records.push(Object.assign({ id: nextId() }, rec));
-    if (rec.status === "sold" && rec.customer && !db.customers.some(c => c.name === rec.customer)) {
-      db.customers.push({ id: nextId(), name: rec.customer, phone: "", note: "" });
-    }
+    if (id) Object.assign(r, rec);
+    else db.records.push(Object.assign({ id: nextId(), sales: [] }, rec));
+    save(); renderAll(); return true;
+  });
+}
+
+/* ================= 弹窗：卖出一笔 ================= */
+let sellCtx = { cost: 0 };
+function openSellModal(id) {
+  const r = db.records.find(x => x.id === id);
+  if (!r) return;
+  sellCtx = { cost: Number(r.cost) || 0 };
+  const stock = stockOf(r), sold = soldQtyOf(r);
+  const last = (r.sales || []).slice().sort((a, b) => String(a.date).localeCompare(String(b.date))).slice(-1)[0];
+  const custOpts = customersInUse().map(c => `<option value="${esc(c)}">`).join("");
+  const sales = (r.sales || []).slice().sort((a, b) => String(b.date).localeCompare(String(a.date)));
+
+  showModal("卖出一笔 · " + r.product, `
+    <div class="batch-info">
+      这批：${esc(r.date)} 进的 <b>${qtyText(r.qty)}</b> 件，进价 ${money(r.cost)}/件${r.supplier ? "，来自 " + esc(r.supplier) : ""}<br>
+      已卖 <b>${qtyText(sold)}</b> 件，还剩 <b style="color:${stock > 0 ? "#16a34a" : "#dc2626"}">${qtyText(stock)}</b> 件
+    </div>
+    ${sales.length ? `
+      <div class="hint" style="margin:12px 0 5px">已卖出明细（点「删」可删掉记错的）</div>
+      <div class="inner-sales"><table>
+        <thead><tr><th>日期</th><th class="num">数量</th><th class="num">售价</th><th>客户</th><th></th></tr></thead>
+        <tbody>${sales.map(s => `<tr>
+          <td>${esc(s.date || "-")}</td>
+          <td class="num">${qtyText(s.qty)}</td>
+          <td class="num">${money(s.price)}</td>
+          <td>${esc(s.customer || "未填")}</td>
+          <td><button class="btn btn-danger btn-sm" onclick="delSale(${r.id},${s.id})">删</button></td>
+        </tr>`).join("")}</tbody>
+      </table></div>` : ""}
+    <div style="margin-top:14px"></div>
+    <div class="form-grid">
+      <div class="form-row"><label>这次卖出数量 *</label><input type="number" id="s-qty" min="1" step="1" value="${stock > 0 ? stock : 1}"></div>
+      <div class="form-row"><label>卖出单价（¥/件）*</label><input type="number" id="s-price" min="0" step="0.01" value="${last ? last.price : ""}" placeholder="0.00"></div>
+    </div>
+    <div class="form-row"><label>卖给谁（客户）*</label>
+      <input id="s-customer" list="dl-cust" value="${last ? esc(last.customer || "") : ""}" placeholder="客户名称">
+      <datalist id="dl-cust">${custOpts}</datalist>
+    </div>
+    <div class="form-row"><label>卖货日期</label><input type="date" id="s-date" value="${today()}"></div>
+    <div class="hint" id="sellHint"></div>
+  `, () => {
+    const q = numv("s-qty"), p = numv("s-price"), cust = val("s-customer");
+    if (!(q > 0)) { alert("请填写卖出数量"); return false; }
+    if (q > stock + 1e-9) { alert(`这批最多还能卖 ${qtyText(stock)} 件`); return false; }
+    if (!cust) { alert("请填写客户名称（客户记录单要用）"); return false; }
+    r.sales = r.sales || [];
+    r.sales.push({ id: nextId(), date: val("s-date") || today(), qty: q, price: p, customer: cust });
+    ensureCustomer(cust);
     save(); renderAll(); return true;
   });
 
-  toggleSaleFields();
-  ["r-price", "r-cost", "r-qty"].forEach(fid => {
+  ["s-qty", "s-price"].forEach(fid => {
     const el = document.getElementById(fid);
-    if (el) el.addEventListener("input", updateProfitHint);
+    if (el) el.addEventListener("input", updateSellHint);
   });
-  updateProfitHint();
+  updateSellHint();
 }
 
-function toggleSaleFields() {
-  const box = document.getElementById("saleBox");
-  if (!box) return;
-  const status = document.querySelector('input[name=status]:checked').value;
-  box.style.display = status === "sold" ? "" : "none";
-  document.getElementById("lbl-sold").classList.toggle("checked", status === "sold");
-  document.getElementById("lbl-stock").classList.toggle("checked", status !== "sold");
-  updateProfitHint();
-}
-function updateProfitHint() {
-  const el = document.getElementById("profitHint");
+function updateSellHint() {
+  const el = document.getElementById("sellHint");
   if (!el) return;
-  const p = numv("r-price"), c = numv("r-cost"), q = numv("r-qty");
-  if (p > 0 && q > 0) {
-    const profit = q * (p - c);
-    el.innerHTML = `本笔毛利 <b style="color:${profit >= 0 ? "#16a34a" : "#dc2626"}">${money(profit)}</b>（进价合计 ${money(c * q)}，售价合计 ${money(p * q)}）`;
-  } else el.textContent = "填好进价和售价，这里会自动算本笔毛利";
+  const q = numv("s-qty"), p = numv("s-price"), cost = sellCtx.cost || 0;
+  if (q > 0) {
+    const profit = q * (p - cost);
+    el.innerHTML = `本笔：收款 <b>${money(q * p)}</b>，成本 <b>${money(q * cost)}</b>，毛利 <b style="color:${profit >= 0 ? "#16a34a" : "#dc2626"}">${money(profit)}</b>`;
+  } else el.textContent = "填好数量和售价，这里自动算本笔毛利";
+}
+
+function delSale(recordId, saleId) {
+  const r = db.records.find(x => x.id === recordId);
+  if (!r) return;
+  if (!confirm("确定删除这条卖出记录吗？删掉后库存会加回去。")) return;
+  r.sales = (r.sales || []).filter(s => s.id !== saleId);
+  save(); renderAll();
+  openSellModal(recordId);
 }
 
 function delRecord(id) {
-  if (!confirm("确定删除这条记录吗？")) return;
-  db.records = db.records.filter(r => r.id !== id);
+  const r = db.records.find(x => x.id === id);
+  if (!r) return;
+  const msg = (r.sales || []).length
+    ? `这条记录里有 ${r.sales.length} 笔卖出记录，一起删除吗？`
+    : "确定删除这条进货记录吗？";
+  if (!confirm(msg)) return;
+  db.records = db.records.filter(x => x.id !== id);
   save(); renderAll();
 }
 
-/* ================= 客户弹窗 ================= */
-function openCustomerModal(id) {
-  const c = db.customers.find(x => x.id === id) || {};
+/* ================= 弹窗：客户 ================= */
+function openCustomerModal(id, nameFromRow) {
+  const c = (id != null ? db.customers.find(x => x.id === id) : null) || { name: nameFromRow || "" };
   const oldName = c.name || "";
-  showModal(id ? "修改客户" : "新增客户", `
+  showModal(id != null ? "修改客户" : "新增客户", `
     <div class="form-row"><label>客户名称 *</label><input id="c-name" value="${esc(oldName)}"></div>
     <div class="form-row"><label>电话</label><input id="c-phone" value="${esc(c.phone || "")}"></div>
     <div class="form-row"><label>备注</label><input id="c-note" value="${esc(c.note || "")}" placeholder="如：修理厂、地址"></div>
-    <div class="hint">提示：记一笔时直接输入新客户名，也会自动建档到这里。</div>
+    <div class="hint">提示：卖货时直接输入新客户名，也会自动建档到这里。改名会同步更新历史卖出记录里的客户名。</div>
   `, () => {
     const n = val("c-name");
     if (!n) { alert("请填写客户名称"); return false; }
-    if (id) {
+    if (db.customers.some(x => x.name === n && x.id !== c.id)) { alert("该客户名已存在"); return false; }
+    if (id != null) {
       if (n !== oldName) {
-        if (db.customers.some(x => x.name === n && x.id !== id)) { alert("该客户名已存在"); return false; }
-        db.records.forEach(r => { if (r.customer === oldName) r.customer = n; });
+        db.records.forEach(r => (r.sales || []).forEach(s => { if (s.customer === oldName) s.customer = n; }));
       }
       Object.assign(c, { name: n, phone: val("c-phone"), note: val("c-note") });
     } else {
-      if (db.customers.some(x => x.name === n)) { alert("该客户名已存在"); return false; }
       db.customers.push({ id: nextId(), name: n, phone: val("c-phone"), note: val("c-note") });
     }
     save(); renderAll(); return true;
@@ -604,7 +805,10 @@ function openCustomerModal(id) {
 function delCustomer(id) {
   const c = db.customers.find(x => x.id === id);
   if (!c) return;
-  if (db.records.some(r => r.customer === c.name)) { alert("该客户还有交易记录，不能删除。"); return; }
+  if (db.records.some(r => (r.sales || []).some(s => s.customer === c.name))) {
+    alert("该客户还有卖出记录，不能删除。");
+    return;
+  }
   if (!confirm("确定删除该客户吗？")) return;
   db.customers = db.customers.filter(x => x.id !== id);
   save(); renderAll();
@@ -626,7 +830,8 @@ function importData(input) {
   reader.onload = () => {
     try {
       const data = JSON.parse(reader.result);
-      if (Array.isArray(data.records)) db = data;
+      if (Array.isArray(data.records) && data.records.some(r => Array.isArray(r.sales))) db = normalize(data);
+      else if (Array.isArray(data.records)) db = upgradeV2(data);
       else if (Array.isArray(data.parts) || Array.isArray(data.purchases)) db = migrateOld(data);
       else throw new Error("格式不对");
       save(); renderAll(); alert("导入成功！");
@@ -638,6 +843,11 @@ function importData(input) {
 
 /* ================= 启动 ================= */
 renderAll();
+window.__app = {
+  get db() { return db; },
+  set db(v) { db = v; save(); },
+  save: save, renderAll: renderAll
+};
 if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
   navigator.serviceWorker.register("./sw.js").catch(() => {});
 }
