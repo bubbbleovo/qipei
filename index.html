@@ -106,6 +106,53 @@
   .pick-row .nm .sm { display: block; font-weight: 400; font-size: 11px; color: #9ca3af; margin-top: 1px; }
   .pick-row input[type=number] { width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; font-family: inherit; text-align: right; }
   .order-tag { display: inline-block; background: #e0e7ff; color: #3730a3; border-radius: 6px; padding: 0 5px; font-size: 10px; font-weight: 700; margin-left: 4px; }
+  /* ===== 客户销货记录 ===== */
+  .cs-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+  .cs-head h2 { margin: 0; }
+  .cs-head select { padding: 7px 9px; border: 1px solid #d1d5db; border-radius: 7px; font-size: 13px; background: #fff; font-family: inherit; max-width: 100%; }
+  .cs-name { color: #2563eb; }
+  .cs-meta { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: #475569; margin-bottom: 10px; }
+  .cs-list { display: flex; flex-direction: column; gap: 7px; }
+  .cs-month { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap;
+    background: #eef2f7; border-radius: 7px; padding: 6px 10px; margin: 8px 0 1px; font-size: 12px; font-weight: 700; color: #1e3a5f; }
+  .cs-month:first-child { margin-top: 0; }
+  .cs-month .sm { font-weight: 500; color: #64748b; }
+  .cs-item { border: 1px solid #e8edf4; border-radius: 9px; padding: 9px 11px; background: #fff; }
+  .cs-l1 { display: flex; align-items: baseline; gap: 8px; }
+  .cs-date { font-size: 12px; color: #64748b; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .cs-prod { flex: 1; font-size: 13px; font-weight: 600; color: #1e3a5f; word-break: break-all; line-height: 1.4; }
+  .cs-amt { font-size: 14px; font-weight: 700; color: #1e3a5f; white-space: nowrap; }
+  .cs-l2 { display: flex; flex-wrap: wrap; gap: 3px 12px; font-size: 12px; color: #475569; margin-top: 3px; }
+  .cs-l2 .sm { color: #94a3b8; }
+  .cs-l3 { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 7px; }
+  .cs-empty { text-align: center; color: #9ca3af; font-size: 13px; padding: 22px 0; }
+  tr.sel-row td { background: #eff6ff; }
+  /* ===== 销货记录（全部卖出流水） ===== */
+  .seg { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+  .seg button { border: 1px solid #d1d5db; background: #fff; color: #475569; border-radius: 18px; padding: 7px 14px;
+    font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; }
+  .seg button.active { background: #1e3a5f; border-color: #1e3a5f; color: #fff; }
+  #salesTable { min-width: 900px; }
+  .rs-none { text-align: center; color: #9ca3af; padding: 26px 0; font-size: 13px; }
+  @media (max-width: 640px) {
+    .rs-table { min-width: 0 !important; }
+    .rs-table thead { display: none; }
+    .rs-table tbody, .rs-table tfoot { display: block; }
+    .rs-table tr { display: block; border: 1px solid #e8edf4; border-radius: 9px; padding: 6px 3px 4px;
+      margin-bottom: 8px; background: #fff; }
+    .rs-table td { display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+      border: none; padding: 4px 9px; font-size: 13px; text-align: right; }
+    .rs-table td::before { content: attr(data-label); color: #94a3b8; font-size: 12px;
+      font-weight: 400; flex: none; text-align: left; }
+    .rs-table td .cell-v { margin-left: auto; display: flex; gap: 4px; align-items: baseline;
+      justify-content: flex-end; text-align: right; word-break: break-all; }
+    .rs-table td.first { font-size: 14px; font-weight: 700; color: #1e3a5f; }
+    .rs-table td.first::before { display: none; }
+    .rs-table td.acts { justify-content: flex-end; gap: 10px; border-top: 1px dashed #eef2f7; margin-top: 4px; padding-top: 8px; }
+    .rs-table td.acts::before { display: none; }
+    .rs-table td.hide-sm { display: none; }
+    .rs-table tfoot tr { background: #f1f5f9; }
+  }
   /* ===== 打印 / 送货单 ===== */
   .print-overlay { display: none; position: fixed; inset: 0; background: #f0f2f5; overflow: auto; z-index: 300; }
   .print-overlay.show { display: block; }
@@ -157,7 +204,7 @@
 <div class="header">
   <div>
     <h1>🚚 嘉诺汽配 · 进销货记录</h1>
-    <div class="sub">一条记一批进货：进价、数量、商家；卖多少记多少，库存自动算｜数据存本机，建议定期导出备份<span id="verTag" style="opacity:.55"> · v12</span></div>
+    <div class="sub">一条记一批进货：进价、数量、商家；卖多少记多少，库存自动算｜数据存本机，建议定期导出备份<span id="verTag" style="opacity:.55"> · v14</span></div>
   </div>
   <div class="header-actions">
     <button class="btn btn-outline" id="fsBtn" onclick="toggleFullscreen()" style="display:none">⛶ 全屏</button>
@@ -170,6 +217,7 @@
 <div class="nav">
   <button class="active" data-tab="records" onclick="switchTab('records')">📋 进销货记录</button>
   <button data-tab="stock" onclick="switchTab('stock')">📦 库存</button>
+  <button data-tab="sales" onclick="switchTab('sales')">🧾 销货记录</button>
   <button data-tab="customers" onclick="switchTab('customers')">👥 客户记录</button>
   <button data-tab="dash" onclick="switchTab('dash')">📊 经营汇总</button>
 </div>
@@ -212,6 +260,38 @@
     </div>
   </section>
 
+  <!-- 销货记录（全部卖出流水，一个客户一次买多个商品也一清二楚） -->
+  <section id="tab-sales" style="display:none">
+    <div class="card">
+      <div class="seg" id="salesSeg">
+        <button class="active" data-view="flow" onclick="setSalesView('flow')">全部流水</button>
+        <button data-view="cust" onclick="setSalesView('cust')">按客户</button>
+        <button data-view="prod" onclick="setSalesView('prod')">按商品</button>
+        <button data-view="month" onclick="setSalesView('month')">按月份</button>
+      </div>
+      <div class="toolbar">
+        <select id="sfQuick" onchange="applyQuickRange(this.value)">
+          <option value="">全部时间</option>
+          <option value="30">近 30 天</option>
+          <option value="90">近 90 天</option>
+          <option value="365">近 1 年</option>
+        </select>
+        <input type="date" id="sfFrom" onchange="renderSales()" title="卖出日期起">
+        <input type="date" id="sfTo" onchange="renderSales()" title="卖出日期止">
+        <select id="sfCustomer" onchange="renderSales()"><option value="">全部客户</option></select>
+        <select id="sfProduct" onchange="renderSales()"><option value="">全部商品</option></select>
+        <input type="text" id="sfKeyword" placeholder="搜客户 / 商品 / 单号" oninput="renderSales()" style="flex:1;min-width:130px">
+        <label class="chk-label"><input type="checkbox" id="sfDebtOnly" onchange="renderSales()"> 只看有欠款</label>
+        <button class="btn btn-outline btn-sm" onclick="clearSalesFilters()">重置</button>
+        <button class="btn btn-outline btn-sm" onclick="exportSalesCsv()">⬇ 导出表格</button>
+        <button class="btn btn-success btn-sm" onclick="openBulkSellModal()">🧾 多商品开单</button>
+      </div>
+      <div id="salesSum"></div>
+      <div class="table-wrap"><table id="salesTable" class="rs-table"></table></div>
+      <div class="hint" id="salesHint"></div>
+    </div>
+  </section>
+
   <!-- 客户记录 -->
   <section id="tab-customers" style="display:none">
     <div class="card">
@@ -224,6 +304,32 @@
       </div>
       <div id="custSum"></div>
       <div class="table-wrap"><table id="customersTable"></table></div>
+    </div>
+
+    <!-- 客户销货记录：点客户行的「销货记录」展开，数据与卖出记录实时同步 -->
+    <div class="card" id="custSalesCard" style="display:none">
+      <div class="cs-head">
+        <h2>📋 销货记录 <span class="cs-name" id="csName"></span></h2>
+        <span class="spacer"></span>
+        <select id="custSalesPick" onchange="pickCustSales(this.value)" title="切换客户"></select>
+      </div>
+      <div class="cs-meta" id="csMeta"></div>
+      <div class="toolbar">
+        <select id="csRange" onchange="renderCustSales()">
+          <option value="all">全部时间</option>
+          <option value="30">近 30 天</option>
+          <option value="90">近 90 天</option>
+          <option value="365">近 1 年</option>
+        </select>
+        <label class="chk-label"><input type="checkbox" id="csOnlyDebt" onchange="renderCustSales()"> 只看有欠款的</label>
+        <span class="spacer"></span>
+        <button class="btn btn-outline btn-sm" onclick="csReceipt()">💰 收款</button>
+        <button class="btn btn-outline btn-sm" onclick="csStatement()">🖨 对账单</button>
+        <button class="btn btn-primary btn-sm" onclick="csNewOrder()">＋ 给这位客户开单</button>
+        <button class="btn btn-outline btn-sm" onclick="closeCustSales()">收起</button>
+      </div>
+      <div id="custSalesSum"></div>
+      <div id="custSalesList" class="cs-list"></div>
     </div>
   </section>
 
@@ -578,10 +684,312 @@ function customerStats() {
   return Object.values(map);
 }
 
+/* ================= 销货记录：全部卖出流水 + 按客户/商品/月份汇总 ================= */
+let salesView = "flow";
+const SALES_LIMIT = 200;
+
+/* 把所有批次的卖出明细拉平成一张流水表（一行 = 一笔卖出） */
+function allSaleRows() {
+  const out = [];
+  db.records.forEach(r => (r.sales || []).forEach(s => {
+    const qty = Number(s.qty) || 0, price = Number(s.price) || 0, cost = Number(r.cost) || 0;
+    out.push({
+      rid: r.id, sid: s.id, order: s.order || "",
+      date: s.date || r.date || "",
+      customer: custKey(s),
+      product: r.product || "",
+      qty: qty, price: price,
+      total: Math.round(qty * price * 100) / 100,
+      paid: salePaid(s),
+      debt: saleDebt(s),
+      costAmt: Math.round(qty * cost * 100) / 100,
+      profit: Math.round((qty * price - qty * cost) * 100) / 100
+    });
+  }));
+  return out.sort((a, b) => String(b.date).localeCompare(String(a.date)) || (b.sid - a.sid));
+}
+
+function salesFilters() {
+  const d = document.getElementById("sfDebtOnly");
+  return {
+    from: val("sfFrom"), to: val("sfTo"),
+    customer: val("sfCustomer"), product: val("sfProduct"),
+    kw: (val("sfKeyword") || "").toLowerCase(),
+    debtOnly: !!(d && d.checked)
+  };
+}
+
+function filteredSales() {
+  const f = salesFilters();
+  return allSaleRows().filter(x => {
+    if (f.from && String(x.date) < f.from) return false;
+    if (f.to && String(x.date) > f.to) return false;
+    if (f.customer && x.customer !== f.customer) return false;
+    if (f.product && x.product !== f.product) return false;
+    if (f.debtOnly && x.debt <= 0.005) return false;
+    if (f.kw) {
+      const hay = (x.customer + " " + x.product + " " + x.order).toLowerCase();
+      if (!hay.includes(f.kw)) return false;
+    }
+    return true;
+  });
+}
+
+function fillSalesFilters() {
+  const fc = document.getElementById("sfCustomer"), fp = document.getElementById("sfProduct");
+  if (!fc || !fp) return;
+  fc.dataset.first = '<option value="">全部客户</option>';
+  fp.dataset.first = '<option value="">全部商品</option>';
+  fillSelect(fc, customersInUse());
+  fillSelect(fp, productsInUse());
+}
+
+function setSalesView(v) {
+  salesView = v;
+  document.querySelectorAll("#salesSeg button").forEach(b => b.classList.toggle("active", b.dataset.view === v));
+  renderSales();
+}
+
+function applyQuickRange(days) {
+  const n = Number(days) || 0;
+  const from = document.getElementById("sfFrom"), to = document.getElementById("sfTo");
+  if (!n) { from.value = ""; to.value = ""; }
+  else {
+    const d = new Date(); d.setDate(d.getDate() - n);
+    from.value = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+    to.value = "";
+  }
+  renderSales();
+}
+
+function clearSalesFilters() {
+  ["sfFrom", "sfTo", "sfKeyword"].forEach(id => { const el = document.getElementById(id); if (el) el.value = ""; });
+  ["sfCustomer", "sfProduct", "sfQuick"].forEach(id => { const el = document.getElementById(id); if (el) el.value = ""; });
+  const d = document.getElementById("sfDebtOnly"); if (d) d.checked = false;
+  renderSales();
+}
+
+/* 点客户/商品汇总里的「看流水」：切回流水并按该客户/商品过滤 */
+function viewCustomerFlow(name) {
+  const el = document.getElementById("sfCustomer");
+  if (el) el.value = name;
+  setSalesView("flow");
+}
+function viewProductFlow(name) {
+  const el = document.getElementById("sfProduct");
+  if (el) el.value = name;
+  setSalesView("flow");
+}
+
+function rsTableHtml(head, rows, foot) {
+  const th = head.map(h => `<th class="${h.cls || ""}">${h.t}</th>`).join("");
+  const td = c => `<td data-label="${esc(c.l || "")}" class="${c.cls || ""}"><span class="cell-v">${c.h !== undefined ? c.h : c.v}</span></td>`;
+  const body = rows.length
+    ? rows.map(r => `<tr>${r.cells.map(td).join("")}${r.acts !== undefined ? `<td class="acts">${r.acts}</td>` : ""}</tr>`).join("")
+    : `<tr><td class="rs-none" colspan="${head.length}">没有符合条件的销货记录</td></tr>`;
+  const tf = foot ? `<tfoot><tr>${foot.cells.map(td).join("")}${foot.acts !== undefined ? `<td class="acts">${foot.acts}</td>` : ""}</tr></tfoot>` : "";
+  return `<thead><tr>${th}</tr></thead><tbody>${body}</tbody>${tf}`;
+}
+
+function salesTotals(list) {
+  return list.reduce((a, x) => {
+    a.n += 1; a.qty += x.qty; a.total += x.total;
+    a.paid += x.paid; a.debt += x.debt; a.cost += x.costAmt; a.profit += x.profit;
+    return a;
+  }, { n: 0, qty: 0, total: 0, paid: 0, debt: 0, cost: 0, profit: 0 });
+}
+
+function rateText(profit, total) {
+  if (!total) return "—";
+  return (Math.round(profit / total * 1000) / 10) + "%";
+}
+
+function renderSales() {
+  const table = document.getElementById("salesTable");
+  if (!table) return;
+  fillSalesFilters();
+  const list = filteredSales();
+  const s = salesTotals(list);
+  const box = document.getElementById("salesSum");
+  if (box) {
+    box.innerHTML = `<div class="sum-bar">
+      <span>笔数 <b>${s.n}</b></span>
+      <span>件数 <b>${qtyText(s.qty)}</b></span>
+      <span>销售额 <b>${money(s.total)}</b></span>
+      <span>已收 <b style="color:#16a34a">${money(s.paid)}</b></span>
+      <span>欠款 <b style="color:${s.debt > 0.005 ? "#dc2626" : "#1e3a5f"}">${money(s.debt)}</b></span>
+      <span class="profit">毛利 ${money(s.profit)}（${rateText(s.profit, s.total)}）</span>
+    </div>`;
+  }
+  const shown = list.slice(0, SALES_LIMIT);
+
+  if (salesView === "flow") {
+    const head = [{ t: "日期" }, { t: "客户" }, { t: "商品" }, { t: "数量", cls: "num" }, { t: "单价", cls: "num" },
+      { t: "金额", cls: "num" }, { t: "已收", cls: "num" }, { t: "欠款", cls: "num" }, { t: "操作" }];
+    const rows = shown.map(x => ({
+      cells: [
+        { l: "日期", v: esc(x.date || "—"), cls: "first" },
+        { l: "客户", v: esc(x.customer) },
+        { l: "商品", v: esc(x.product) + (x.order ? `<span class="order-tag">${esc(String(x.order).slice(-3))}</span>` : "") },
+        { l: "数量", v: qtyText(x.qty), cls: "num" },
+        { l: "单价", v: money(x.price), cls: "num" },
+        { l: "金额", v: money(x.total), cls: "num" },
+        { l: "已收", v: money(x.paid), cls: "num paid-num" },
+        { l: "欠款", v: x.debt > 0.005 ? money(x.debt) : "—", cls: "num " + (x.debt > 0.005 ? "debt-num" : "muted") }
+      ],
+      acts: `<a class="mini-link" onclick="openEditSaleModal(${x.rid},${x.sid})">改</a>` +
+        (x.order
+          ? `<a class="mini-link" data-order="${esc(x.order)}" onclick="printOrderSlip(this.dataset.order)">整单</a>`
+          : `<a class="mini-link" onclick="printSlip(${x.rid},${x.sid})">送货单</a>`)
+    }));
+    table.innerHTML = rsTableHtml(head, rows);
+  } else if (salesView === "cust") {
+    const map = {};
+    list.forEach(x => {
+      const o = map[x.customer] || (map[x.customer] = { name: x.customer, n: 0, qty: 0, total: 0, paid: 0, debt: 0, profit: 0, last: "" });
+      o.n += 1; o.qty += x.qty; o.total += x.total; o.paid += x.paid; o.debt += x.debt; o.profit += x.profit;
+      if (x.date > o.last) o.last = x.date;
+    });
+    const groups = Object.values(map).sort((a, b) => b.total - a.total);
+    const head = [{ t: "客户" }, { t: "笔数", cls: "num" }, { t: "件数", cls: "num" }, { t: "销售额", cls: "num" },
+      { t: "已收", cls: "num" }, { t: "欠款", cls: "num" }, { t: "最近一次", cls: "num" }, { t: "操作" }];
+    const rows = groups.map(g => ({
+      cells: [
+        { l: "客户", v: esc(g.name), cls: "first" },
+        { l: "笔数", v: g.n, cls: "num" },
+        { l: "件数", v: qtyText(g.qty), cls: "num" },
+        { l: "销售额", v: money(g.total), cls: "num" },
+        { l: "已收", v: money(g.paid), cls: "num paid-num" },
+        { l: "欠款", v: g.debt > 0.005 ? money(g.debt) : "—", cls: "num " + (g.debt > 0.005 ? "debt-num" : "muted") },
+        { l: "最近一次", v: esc(g.last || "—"), cls: "num" }
+      ],
+      acts: `<a class="mini-link" data-cust="${esc(g.name)}" onclick="viewCustomerFlow(this.dataset.cust)">看流水</a>` +
+        `<a class="mini-link" data-cust="${esc(g.name)}" onclick="printStatement(this.dataset.cust)">对账单</a>`
+    }));
+    table.innerHTML = rsTableHtml(head, rows);
+  } else if (salesView === "prod") {
+    const map = {};
+    list.forEach(x => {
+      const o = map[x.product] || (map[x.product] = { name: x.product, n: 0, qty: 0, total: 0, cost: 0, profit: 0, custs: new Set() });
+      o.n += 1; o.qty += x.qty; o.total += x.total; o.cost += x.costAmt; o.profit += x.profit;
+      o.custs.add(x.customer);
+    });
+    const groups = Object.values(map).sort((a, b) => b.profit - a.profit);
+    const head = [{ t: "商品" }, { t: "卖出件数", cls: "num" }, { t: "均价", cls: "num" }, { t: "销售额", cls: "num" },
+      { t: "成本", cls: "num" }, { t: "毛利", cls: "num" }, { t: "毛利率", cls: "num" }, { t: "剩余库存", cls: "num" }, { t: "操作" }];
+    const rows = groups.map(g => ({
+      cells: [
+        { l: "商品", v: esc(g.name), cls: "first" },
+        { l: "卖出件数", v: qtyText(g.qty), cls: "num" },
+        { l: "均价", v: money(g.qty ? g.total / g.qty : 0), cls: "num" },
+        { l: "销售额", v: money(g.total), cls: "num" },
+        { l: "成本", v: money(g.cost), cls: "num" },
+        { l: "毛利", v: money(g.profit), cls: "num", h: `<span style="color:${g.profit >= 0 ? "#16a34a" : "#dc2626"};font-weight:700">${money(g.profit)}</span>` },
+        { l: "毛利率", v: rateText(g.profit, g.total), cls: "num" },
+        { l: "剩余库存", v: qtyText(db.records.filter(r => r.product === g.name).reduce((a, r) => a + stockOf(r), 0)) + " 件", cls: "num" }
+      ],
+      acts: `<a class="mini-link" data-prod="${esc(g.name)}" onclick="viewProductFlow(this.dataset.prod)">看流水</a>`
+    }));
+    table.innerHTML = rsTableHtml(head, rows);
+  } else {
+    const map = {};
+    list.forEach(x => {
+      const m = String(x.date || "").slice(0, 7) || "未填日期";
+      const o = map[m] || (map[m] = { m: m, n: 0, qty: 0, total: 0, cost: 0, profit: 0 });
+      o.n += 1; o.qty += x.qty; o.total += x.total; o.cost += x.costAmt; o.profit += x.profit;
+    });
+    const groups = Object.values(map).sort((a, b) => String(b.m).localeCompare(String(a.m)));
+    const head = [{ t: "月份" }, { t: "笔数", cls: "num" }, { t: "件数", cls: "num" }, { t: "销售额", cls: "num" },
+      { t: "成本", cls: "num" }, { t: "毛利", cls: "num" }, { t: "毛利率", cls: "num" }];
+    const rows = groups.map(g => ({
+      cells: [
+        { l: "月份", v: esc(g.m), cls: "first" },
+        { l: "笔数", v: g.n, cls: "num" },
+        { l: "件数", v: qtyText(g.qty), cls: "num" },
+        { l: "销售额", v: money(g.total), cls: "num" },
+        { l: "成本", v: money(g.cost), cls: "num" },
+        { l: "毛利", v: money(g.profit), cls: "num", h: `<span style="color:${g.profit >= 0 ? "#16a34a" : "#dc2626"};font-weight:700">${money(g.profit)}</span>` },
+        { l: "毛利率", v: rateText(g.profit, g.total), cls: "num" }
+      ]
+    }));
+    const foot = {
+      cells: [
+        { l: "合计", v: "合计", cls: "first" },
+        { l: "笔数", v: s.n, cls: "num" },
+        { l: "件数", v: qtyText(s.qty), cls: "num" },
+        { l: "销售额", v: money(s.total), cls: "num" },
+        { l: "成本", v: money(s.cost), cls: "num" },
+        { l: "毛利", v: money(s.profit), cls: "num" },
+        { l: "毛利率", v: rateText(s.profit, s.total), cls: "num" }
+      ]
+    };
+    table.innerHTML = rsTableHtml(head, rows, foot);
+  }
+
+  const hint = document.getElementById("salesHint");
+  if (hint) {
+    const more = list.length > shown.length ? ` 已按时间倒序只显示前 ${SALES_LIMIT} 笔，请缩小日期范围或加筛选。` : "";
+    hint.innerHTML = salesView === "flow"
+      ? `共 ${list.length} 笔卖出。这里和「进销货记录 / 库存 / 客户欠款」用的是同一份数据，改一笔、删一笔，各处立刻跟着变。${more}`
+      : `共 ${list.length} 笔卖出，按${salesView === "cust" ? "客户" : salesView === "prod" ? "商品" : "月份"}汇总，点「看流水」看明细。${more}`;
+  }
+}
+
+function salesCsvRows() {
+  const list = filteredSales();
+  if (salesView === "flow") {
+    const rows = [["卖出日期", "客户", "商品", "数量", "单价", "金额", "已收", "欠款", "单号"]];
+    list.forEach(x => rows.push([x.date, x.customer, x.product, qtyText(x.qty), x.price, x.total, x.paid, x.debt, x.order]));
+    return rows;
+  }
+  if (salesView === "cust") {
+    const map = {};
+    list.forEach(x => {
+      const o = map[x.customer] || (map[x.customer] = { name: x.customer, n: 0, qty: 0, total: 0, paid: 0, debt: 0, last: "" });
+      o.n++; o.qty += x.qty; o.total += x.total; o.paid += x.paid; o.debt += x.debt;
+      if (x.date > o.last) o.last = x.date;
+    });
+    const rows = [["客户", "笔数", "件数", "销售额", "已收", "欠款", "最近一次"]];
+    Object.values(map).sort((a, b) => b.total - a.total).forEach(g =>
+      rows.push([g.name, g.n, qtyText(g.qty), g.total.toFixed(2), g.paid.toFixed(2), g.debt.toFixed(2), g.last]));
+    return rows;
+  }
+  if (salesView === "prod") {
+    const map = {};
+    list.forEach(x => {
+      const o = map[x.product] || (map[x.product] = { name: x.product, qty: 0, total: 0, cost: 0, profit: 0 });
+      o.qty += x.qty; o.total += x.total; o.cost += x.costAmt; o.profit += x.profit;
+    });
+    const rows = [["商品", "卖出件数", "均价", "销售额", "成本", "毛利", "毛利率", "剩余库存"]];
+    Object.values(map).sort((a, b) => b.profit - a.profit).forEach(g =>
+      rows.push([g.name, qtyText(g.qty), (g.qty ? g.total / g.qty : 0).toFixed(2), g.total.toFixed(2), g.cost.toFixed(2),
+        g.profit.toFixed(2), rateText(g.profit, g.total), qtyText(db.records.filter(r => r.product === g.name).reduce((a, r) => a + stockOf(r), 0))]));
+    return rows;
+  }
+  const map = {};
+  list.forEach(x => {
+    const m = String(x.date || "").slice(0, 7) || "未填日期";
+    const o = map[m] || (map[m] = { m: m, n: 0, qty: 0, total: 0, cost: 0, profit: 0 });
+    o.n++; o.qty += x.qty; o.total += x.total; o.cost += x.costAmt; o.profit += x.profit;
+  });
+  const rows = [["月份", "笔数", "件数", "销售额", "成本", "毛利", "毛利率"]];
+  Object.values(map).sort((a, b) => String(b.m).localeCompare(String(a.m))).forEach(g =>
+    rows.push([g.m, g.n, qtyText(g.qty), g.total.toFixed(2), g.cost.toFixed(2), g.profit.toFixed(2), rateText(g.profit, g.total)]));
+  return rows;
+}
+
+function exportSalesCsv() {
+  const rows = salesCsvRows();
+  if (rows.length <= 1) { alert("当前筛选条件下没有可导出的记录"); return; }
+  const csv = "\ufeff" + rows.map(r => r.map(c => `"${String(c == null ? "" : c).replace(/"/g, '""')}"`).join(",")).join("\r\n");
+  const label = { flow: "全部流水", cust: "按客户", prod: "按商品", month: "按月份" }[salesView] || "销货记录";
+  saveTextFile("销货记录_" + label + "_" + today() + ".csv", csv);
+}
+
 /* ================= 标签页 ================= */
 function switchTab(tab) {
   document.querySelectorAll(".nav button").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
-  ["records", "stock", "customers", "dash"].forEach(t => { document.getElementById("tab-" + t).style.display = (t === tab) ? "" : "none"; });
+  ["records", "stock", "sales", "customers", "dash"].forEach(t => { document.getElementById("tab-" + t).style.display = (t === tab) ? "" : "none"; });
   renderAll();
 }
 
@@ -778,6 +1186,195 @@ function sellProduct(product) {
   openSellModal(batch.id);
 }
 
+/* ================= 客户销货记录（与卖出记录实时同步） ================= */
+var csCtx = { name: "" };
+
+/* 某位客户的全部卖出明细，按日期倒序（最新在上） */
+function customerSales(name) {
+  const out = [];
+  if (!name) return out;
+  db.records.forEach(r => (r.sales || []).forEach(s => {
+    if (custKey(s) !== name) return;
+    out.push({ r: r, s: s, amount: saleTotal(s), paid: salePaid(s), debt: saleDebt(s) });
+  }));
+  out.sort((a, b) => String(b.s.date || "").localeCompare(String(a.s.date || "")) || (Number(b.s.id) || 0) - (Number(a.s.id) || 0));
+  return out;
+}
+
+function csDateShift(days) {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  const p = n => String(n).padStart(2, "0");
+  return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
+}
+
+function openCustSales(name) {
+  if (!name) return;
+  csCtx.name = name;
+  renderCustSales();
+  renderCustomers();
+  const card = document.getElementById("custSalesCard");
+  if (card && card.scrollIntoView) setTimeout(() => card.scrollIntoView({ behavior: "smooth", block: "start" }), 30);
+}
+function closeCustSales() {
+  csCtx.name = "";
+  const card = document.getElementById("custSalesCard");
+  if (card) card.style.display = "none";
+  renderCustomers();
+}
+function pickCustSales(name) {
+  csCtx.name = name || "";
+  renderCustSales();
+  renderCustomers();
+}
+function csReceipt() { if (csCtx.name) openReceiptModal(csCtx.name); }
+function csStatement() { if (csCtx.name) printStatement(csCtx.name); }
+function csNewOrder() { openBulkSellModal(csCtx.name); }
+function csEditCustomer() {
+  const c = db.customers.find(x => x.name === csCtx.name);
+  openCustomerModal(c ? c.id : null, csCtx.name);
+}
+function csEdit(rid, sid) { openEditSaleModal(Number(rid), Number(sid)); }
+function csDel(rid, sid) {
+  const r = db.records.find(x => x.id === Number(rid));
+  if (!r) return;
+  const s = (r.sales || []).find(x => x.id === Number(sid));
+  if (!s) return;
+  const who = custKey(s);
+  if (!confirm(`确定删除这笔卖出记录吗？\n\n${who} · ${r.product} · ${qtyText(s.qty)} 件 × ${money(s.price)}\n\n删掉后库存会加回去，欠款和汇总也会一起变。`)) return;
+  r.sales = (r.sales || []).filter(x => x.id !== Number(sid));
+  save();
+  if (!customerSales(csCtx.name).length && !db.customers.some(c => c.name === csCtx.name)) {
+    csCtx.name = "";             // 这位客户已经被删干净了，收起面板
+  }
+  renderAll();
+}
+
+function csMonthLabel(m) {
+  if (!m) return "未填日期";
+  const p = String(m).split("-");
+  return p.length >= 2 ? `${p[0]} 年 ${Number(p[1])} 月` : String(m);
+}
+
+function csItemHtml(x) {
+  const s = x.s, r = x.r;
+  const money2 = [];
+  if (x.debt > 0.005) money2.push(`<span class="debt-num">欠 ${money(x.debt)}</span>`);
+  if (x.paid > 0.005) money2.push(`<span class="paid-num">已收 ${money(x.paid)}</span>`);
+  if (!money2.length) money2.push(`<span class="muted">未收款</span>`);
+  const orderInfo = s.order
+    ? `<span class="sm">单号 ${esc(s.order)}</span>`
+    : `<span class="sm">散单</span>`;
+  return `<div class="cs-item">
+    <div class="cs-l1">
+      <span class="cs-date">${esc(String(s.date || "").slice(5) || "—")}</span>
+      <span class="cs-prod">${esc(r.product)}</span>
+      <span class="cs-amt">${money(x.amount)}</span>
+    </div>
+    <div class="cs-l2">
+      <span>${qtyText(s.qty)} 件 × ${money(s.price)}</span>
+      ${money2.join("")}
+      ${orderInfo}
+    </div>
+    <div class="cs-l3">
+      <button class="btn btn-outline btn-sm" data-rid="${r.id}" data-sid="${s.id}" onclick="csEdit(this.dataset.rid,this.dataset.sid)">改</button>
+      <button class="btn btn-danger btn-sm" data-rid="${r.id}" data-sid="${s.id}" onclick="csDel(this.dataset.rid,this.dataset.sid)">删</button>
+      ${s.order
+        ? `<button class="btn btn-outline btn-sm" data-order="${esc(s.order)}" onclick="printOrderSlip(this.dataset.order)">整单送货单</button>`
+        : `<button class="btn btn-outline btn-sm" data-rid="${r.id}" data-sid="${s.id}" onclick="printSlip(Number(this.dataset.rid),Number(this.dataset.sid))">送货单</button>`}
+    </div>
+  </div>`;
+}
+
+function renderCustSales() {
+  const card = document.getElementById("custSalesCard");
+  if (!card) return;
+
+  const debts = debtByCustomer();
+  const names = customerStats().map(o => o.name).filter(Boolean)
+    .sort((a, b) => (debts[b] || 0) - (debts[a] || 0) || a.localeCompare(b, "zh"));
+  const sel = document.getElementById("custSalesPick");
+  if (sel) {
+    const extra = (csCtx.name && names.indexOf(csCtx.name) < 0) ? [csCtx.name] : [];
+    sel.innerHTML = (names.length || extra.length)
+      ? names.concat(extra).map(n => `<option value="${esc(n)}">${esc(n)}${(debts[n] || 0) > 0.005 ? "（欠 " + money(debts[n]) + "）" : ""}</option>`).join("")
+      : `<option value="">暂无客户</option>`;
+  }
+
+  if (!csCtx.name) { card.style.display = "none"; return; }
+  card.style.display = "";
+  if (sel) sel.value = csCtx.name;
+
+  const nameEl = document.getElementById("csName");
+  if (nameEl) nameEl.textContent = "· " + csCtx.name;
+
+  const all = customerSales(csCtx.name);
+  const c = db.customers.find(x => x.name === csCtx.name) || {};
+  const metaEl = document.getElementById("csMeta");
+  if (metaEl) {
+    const bits = [];
+    if (c.phone) bits.push(`<span>电话 ${esc(c.phone)}</span>`);
+    if (c.note) bits.push(`<span>备注 ${esc(c.note)}</span>`);
+    bits.push(`<span>累计 <b>${all.length}</b> 笔</span>`);
+    bits.push(`<span>最近购买 ${esc(all.length ? (all[0].s.date || "—") : "—")}</span>`);
+    bits.push(`<a class="mini-link" style="margin-left:0" onclick="csEditCustomer()">改客户资料</a>`);
+    metaEl.innerHTML = bits.join("");
+  }
+
+  const rangeEl = document.getElementById("csRange");
+  const range = rangeEl ? rangeEl.value : "all";
+  const onlyDebtEl = document.getElementById("csOnlyDebt");
+  const onlyDebt = !!(onlyDebtEl && onlyDebtEl.checked);
+
+  let rows = all;
+  let filtered = false;
+  if (range && range !== "all") {
+    const from = csDateShift(Number(range) || 0);
+    rows = rows.filter(x => String(x.s.date || "") >= from);
+    filtered = true;
+  }
+  if (onlyDebt) { rows = rows.filter(x => x.debt > 0.005); filtered = true; }
+
+  const qty = rows.reduce((a, x) => a + (Number(x.s.qty) || 0), 0);
+  const amt = rows.reduce((a, x) => a + x.amount, 0);
+  const paid = rows.reduce((a, x) => a + x.paid, 0);
+  const debt = Math.round((amt - paid) * 100) / 100;
+  const profit = rows.reduce((a, x) => a + (Number(x.s.qty) || 0) * ((Number(x.s.price) || 0) - (Number(x.r.cost) || 0)), 0);
+  const sumEl = document.getElementById("custSalesSum");
+  if (sumEl) sumEl.innerHTML = `<div class="sum-bar">
+    <span>${filtered ? "筛选出" : "共"} <b>${rows.length}</b> 笔 / <b>${qtyText(qty)}</b> 件</span>
+    <span>销售额 <b>${money(amt)}</b></span>
+    <span>已收 <b class="paid-num">${money(paid)}</b></span>
+    <span>未收欠款 <b class="${debt > 0.005 ? "debt-num" : ""}">${money(debt)}</b></span>
+    <span>毛利 <b class="${profit >= 0 ? "profit" : "debt-num"}">${money(profit)}</b></span>
+  </div>`;
+
+  const listEl = document.getElementById("custSalesList");
+  if (!listEl) return;
+  if (!rows.length) {
+    listEl.innerHTML = `<div class="cs-empty">${all.length ? "这个筛选条件下没有记录" : "这位客户还没有买过东西"}</div>`;
+    return;
+  }
+
+  let html = "", bucket = [], curMonth = null;
+  const flush = () => {
+    if (!bucket.length) return;
+    const bAmt = bucket.reduce((a, x) => a + x.amount, 0);
+    const bDebt = bucket.reduce((a, x) => a + x.debt, 0);
+    html += `<div class="cs-month"><span>${esc(csMonthLabel(curMonth))}</span>
+      <span class="sm">${bucket.length} 笔 · ${money(bAmt)}${bDebt > 0.005 ? ` · 欠 ${money(bDebt)}` : ""}</span></div>`;
+    bucket.forEach(x => { html += csItemHtml(x); });
+    bucket = [];
+  };
+  rows.forEach(x => {
+    const m = String(x.s.date || "").slice(0, 7);
+    if (curMonth !== m) { flush(); curMonth = m; }
+    bucket.push(x);
+  });
+  flush();
+  listEl.innerHTML = html;
+}
+
 /* ================= 渲染：客户记录 ================= */
 function renderCustomers() {
   const kwEl = document.getElementById("custSearch");
@@ -809,7 +1406,8 @@ function renderCustomers() {
     <thead><tr><th>客户名称</th><th>电话</th><th class="num">购买笔数</th><th class="num">累计件数</th><th class="num">累计金额</th><th class="num">未收欠款</th><th>最近购买</th><th>备注</th><th>操作</th></tr></thead>
     <tbody>${rows.map(o => {
       const c = info[o.name] || {};
-      return `<tr>
+      const on = csCtx.name === o.name;
+      return `<tr class="${on ? "sel-row" : ""}">
         <td><b>${esc(o.name)}</b></td>
         <td>${esc(c.phone || "-")}</td>
         <td class="num">${o.count}</td>
@@ -819,7 +1417,7 @@ function renderCustomers() {
         <td>${o.last ? esc(o.last) : "-"}</td>
         <td>${esc(c.note || "-")}</td>
         <td><div class="row-actions">
-          <button class="btn btn-outline btn-sm" data-customer="${esc(o.name)}" onclick="showCustomerRecords(this.dataset.customer)">看记录</button>
+          <button class="btn btn-${on ? "primary" : "outline"} btn-sm" data-customer="${esc(o.name)}" onclick="openCustSales(this.dataset.customer)">销货记录</button>
           ${o.debt > 0.005 ? `<button class="btn btn-success btn-sm" data-customer="${esc(o.name)}" onclick="openReceiptModal(this.dataset.customer)">收款</button>` : ""}
           <button class="btn btn-outline btn-sm" data-customer="${esc(o.name)}" onclick="printStatement(this.dataset.customer)">对账单</button>
           <button class="btn btn-outline btn-sm" data-customer="${esc(o.name)}" onclick="openCustomerModal(${c.id || "null"}, this.dataset.customer)">改</button>
@@ -930,7 +1528,7 @@ function renderMonthly() {
     : `<tbody><tr><td colspan="11"><div class="empty-tip">还没有卖出记录，卖货之后这里会按月统计利润</div></td></tr></tbody>`;
 }
 
-function renderAll() { renderRecords(); renderStock(); renderCustomers(); renderDash(); renderMonthly(); }
+function renderAll() { renderRecords(); renderStock(); renderSales(); renderCustomers(); renderDash(); renderMonthly(); renderCustSales(); }
 
 /* ================= 弹窗基础 ================= */
 let modalHandler = null;
@@ -1222,7 +1820,7 @@ function bulkStocks() {
     .sort((a, b) => a.product.localeCompare(b.product, "zh"));
 }
 
-function openBulkSellModal() {
+function openBulkSellModal(preCustomer) {
   const stocks = bulkStocks();
   if (!stocks.length) { alert("当前没有可卖的商品（库存都是 0）。\n\n先在「＋ 记一笔进货」里记进货，再来卖。"); return; }
   bulkCtx = { paidTouched: false };
@@ -1312,6 +1910,11 @@ function openBulkSellModal() {
   const paidInput = document.getElementById("b-paid");
   if (paidInput && paidInput.addEventListener) {
     paidInput.addEventListener("input", () => { bulkCtx.paidTouched = true; refreshBulkHint(); });
+  }
+  // 从「客户销货记录」进来时，客户已经填好
+  if (preCustomer) {
+    const ce = document.getElementById("b-customer");
+    if (ce) ce.value = preCustomer;
   }
   refreshBulkHint();
 }
@@ -1453,6 +2056,7 @@ function openCustomerModal(id, nameFromRow) {
     if (id != null) {
       if (n !== oldName) {
         db.records.forEach(r => (r.sales || []).forEach(s => { if (s.customer === oldName) s.customer = n; }));
+        if (csCtx.name === oldName) csCtx.name = n;   // 销货记录面板跟着改名
       }
       Object.assign(c, { name: n, phone: val("c-phone"), note: val("c-note") });
     } else {
@@ -1950,23 +2554,24 @@ function printStatement(name) {
 }
 
 /* ================= 导入导出 ================= */
-function exportData() {
-  const name = "嘉诺汽配_进销货备份_" + today() + ".json";
-  const text = JSON.stringify(db, null, 2);
-  // 手机 App 内（WebView）：保存到手机「下载」文件夹
+/* 存文件：App 内存到「下载」文件夹，浏览器走下载 */
+function saveTextFile(name, text) {
   if (window.AndroidBridge && window.AndroidBridge.saveToDownloads) {
-    try {
-      alert(window.AndroidBridge.saveToDownloads(name, text));
-    } catch (e) {
-      alert("保存失败：" + e);
-    }
+    try { alert(window.AndroidBridge.saveToDownloads(name, text)); } catch (e) { alert("保存失败：" + e); }
     return;
   }
-  const blob = new Blob([text], { type: "application/json" });
+  const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   a.download = name;
+  document.body.appendChild(a);
   a.click();
+  setTimeout(() => { try { URL.revokeObjectURL(a.href); a.remove(); } catch (e) {} }, 1000);
+}
+
+function exportData() {
+  const name = "嘉诺汽配_进销货备份_" + today() + ".json";
+  saveTextFile(name, JSON.stringify(db, null, 2));
 }
 function importData(input) {
   const file = input.files[0];
