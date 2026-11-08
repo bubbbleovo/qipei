@@ -204,7 +204,7 @@
 <div class="header">
   <div>
     <h1>🚚 嘉诺汽配 · 进销货记录</h1>
-    <div class="sub">一条记一批进货：进价、数量、商家；卖多少记多少，库存自动算｜数据存本机，建议定期导出备份<span id="verTag" style="opacity:.55"> · v15</span></div>
+    <div class="sub">一条记一批进货：进价、数量、商家；卖多少记多少，库存自动算｜数据存本机，建议定期导出备份<span id="verTag" style="opacity:.55"> · v16</span></div>
   </div>
   <div class="header-actions">
     <button class="btn btn-outline" id="fsBtn" onclick="toggleFullscreen()" style="display:none">⛶ 全屏</button>
@@ -250,9 +250,17 @@
         <button class="btn btn-success btn-sm" onclick="openBulkSellModal()">🧾 多商品开单</button>
         <select id="stockProduct" onchange="renderStock()"><option value="">全部商品</option></select>
         <input type="text" id="stockSearch" placeholder="搜商品名称" oninput="renderStock()" style="flex:1;min-width:130px">
-        <label class="chk-label">
-          <input type="checkbox" id="stockHideEmpty" onchange="renderStock()"> 只看还有货的
-        </label>
+        <select id="stockState" onchange="renderStock()" title="按有没有货筛选">
+          <option value="">全部商品</option>
+          <option value="in">还有货</option>
+          <option value="out">已卖完（没货）</option>
+        </select>
+        <select id="stockSort" onchange="renderStock()" title="排序方式">
+          <option value="asc">库存 少 → 多</option>
+          <option value="desc">库存 多 → 少</option>
+          <option value="name">按商品名</option>
+          <option value="value">库存成本 高 → 低</option>
+        </select>
         <button class="btn btn-outline btn-sm" onclick="clearStockFilters()">重置</button>
       </div>
       <div id="stockSum"></div>
@@ -1116,14 +1124,24 @@ function renderStock() {
   const sel = document.getElementById("stockProduct");
   fillStockSelect();
   const kw = (document.getElementById("stockSearch").value || "").toLowerCase().trim();
-  const hideEmpty = document.getElementById("stockHideEmpty").checked;
+  const stateEl = document.getElementById("stockState");
+  const sortEl = document.getElementById("stockSort");
+  const state = stateEl ? stateEl.value : "";
+  const sortBy = sortEl ? sortEl.value : "asc";
 
   let stats = productStats().filter(s => s.inQty > 0);
   const allCount = stats.length;
   if (sel.value) stats = stats.filter(s => s.product === sel.value);
   if (kw) stats = stats.filter(s => s.product.toLowerCase().includes(kw));
-  if (hideEmpty) stats = stats.filter(s => s.stockQty > 0);
-  stats.sort((a, b) => b.stockQty - a.stockQty || a.product.localeCompare(b.product, "zh"));
+  if (state === "in") stats = stats.filter(s => s.stockQty > 0);
+  else if (state === "out") stats = stats.filter(s => s.stockQty <= 0);
+
+  // 默认按库存数量从少到多（没货的排最前），同数量按商品名
+  const byName = (a, b) => a.product.localeCompare(b.product, "zh");
+  if (sortBy === "desc") stats.sort((a, b) => b.stockQty - a.stockQty || byName(a, b));
+  else if (sortBy === "name") stats.sort(byName);
+  else if (sortBy === "value") stats.sort((a, b) => b.stockValue - a.stockValue || byName(a, b));
+  else stats.sort((a, b) => a.stockQty - b.stockQty || byName(a, b));
 
   const tQty = stats.reduce((s, x) => s + x.stockQty, 0);
   const tVal = stats.reduce((s, x) => s + x.stockValue, 0);
@@ -1139,7 +1157,9 @@ function renderStock() {
 
   if (!stats.length) {
     const msg = (sel.value || kw) ? `没有符合条件的商品${sel.value ? `（${esc(sel.value)} 已无进货记录）` : ""}`
-      : (hideEmpty ? "当前所有商品都已卖完，取消勾选「只看还有货的」可以查看历史商品" : "暂无库存数据");
+      : state === "in" ? "当前所有商品都已卖完，选「已卖完（没货）」可以查看这些商品"
+        : state === "out" ? "目前没有卖完的商品，所有商品都还有库存"
+          : "暂无库存数据";
     document.getElementById("stockTable").innerHTML = `<tbody><tr><td colspan="7"><div class="empty-tip">${msg}</div></td></tr></tbody>`;
     return;
   }
@@ -1162,7 +1182,10 @@ function renderStock() {
 function clearStockFilters() {
   document.getElementById("stockProduct").value = "";
   document.getElementById("stockSearch").value = "";
-  document.getElementById("stockHideEmpty").checked = false;
+  const st = document.getElementById("stockState");
+  if (st) st.value = "";
+  const so = document.getElementById("stockSort");
+  if (so) so.value = "asc";
   renderStock();
 }
 
