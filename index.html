@@ -96,6 +96,7 @@
     <div class="sub">一条记一批进货：进价、数量、商家；卖多少记多少，库存自动算｜数据存本机，建议定期导出备份</div>
   </div>
   <div class="header-actions">
+    <button class="btn btn-outline" id="fsBtn" onclick="toggleFullscreen()" style="display:none">⛶ 全屏</button>
     <button class="btn btn-outline" onclick="exportData()">导出备份</button>
     <button class="btn btn-outline" onclick="document.getElementById('importFile').click()">导入</button>
     <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(this)">
@@ -870,6 +871,35 @@ if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
   <button id="installClose" aria-label="关闭">×</button>
 </div>
 <script>
+/* ================= 全屏（隐藏地址栏） ================= */
+function isMobileUA() {
+  const ua = navigator.userAgent || "";
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+}
+function isStandaloneMode() {
+  const mq = typeof window.matchMedia === "function" ? window.matchMedia("(display-mode: standalone)") : null;
+  return (mq && mq.matches) || window.navigator.standalone === true;
+}
+function toggleFullscreen() {
+  const d = document, el = d.documentElement;
+  const inFs = d.fullscreenElement || d.webkitFullscreenElement;
+  try {
+    if (inFs) {
+      (d.exitFullscreen || d.webkitExitFullscreen || function () {}).call(d);
+    } else {
+      const fn = el.requestFullscreen || el.webkitRequestFullscreen;
+      if (fn) {
+        const r = fn.call(el);
+        if (r && r.catch) r.catch(() => {});
+      }
+    }
+  } catch (e) {}
+}
+document.addEventListener("fullscreenchange", () => {
+  const btn = document.getElementById("fsBtn");
+  if (btn) btn.textContent = (document.fullscreenElement || document.webkitFullscreenElement) ? "⛶ 退出全屏" : "⛶ 全屏";
+});
+
 /* ================= 添加到主屏幕引导 ================= */
 (function () {
   const KEY = "jnqipei_install_hint_dismissed";
@@ -882,6 +912,15 @@ if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
   const ua = navigator.userAgent || "";
   const mq = typeof window.matchMedia === "function" ? window.matchMedia("(display-mode: standalone)") : null;
   const standalone = (mq && mq.matches) || window.navigator.standalone === true;
+
+  // 手机浏览器里显示「全屏」按钮（点一下隐藏地址栏，接近 App 全屏效果）
+  if (!standalone && typeof isMobileUA === "function" && isMobileUA()) {
+    const fsBtn = document.getElementById("fsBtn");
+    if (fsBtn && (document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen)) {
+      fsBtn.style.display = "inline-block";
+    }
+  }
+
   if (standalone || localStorage.getItem(KEY)) return;
 
   const isWeChat = /MicroMessenger/i.test(ua);
