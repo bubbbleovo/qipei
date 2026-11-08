@@ -852,5 +852,78 @@ if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
   navigator.serviceWorker.register("./sw.js").catch(() => {});
 }
 </script>
+
+<style>
+  #installBar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 999; background: #1e3a5f; color: #fff;
+    padding: 12px 14px calc(12px + env(safe-area-inset-bottom, 0px)); display: flex; align-items: center; gap: 10px;
+    box-shadow: 0 -4px 14px rgba(0,0,0,.18); font-size: 13px; line-height: 1.55; }
+  #installText { flex: 1; }
+  #installText b { color: #93c5fd; }
+  #installBtn { background: #2563eb; color: #fff; border: none; border-radius: 7px; padding: 8px 14px; font-size: 13px;
+    font-family: inherit; font-weight: 600; display: none; white-space: nowrap; }
+  #installClose { background: transparent; border: none; color: rgba(255,255,255,.72); font-size: 20px; line-height: 1;
+    padding: 2px 4px; cursor: pointer; }
+</style>
+<div id="installBar" style="display:none">
+  <div id="installText"></div>
+  <button id="installBtn">立即安装</button>
+  <button id="installClose" aria-label="关闭">×</button>
+</div>
+<script>
+/* ================= 添加到主屏幕引导 ================= */
+(function () {
+  const KEY = "jnqipei_install_hint_dismissed";
+  const bar = document.getElementById("installBar");
+  const textEl = document.getElementById("installText");
+  const btn = document.getElementById("installBtn");
+  const closeBtn = document.getElementById("installClose");
+  if (!bar) return;
+
+  const ua = navigator.userAgent || "";
+  const mq = typeof window.matchMedia === "function" ? window.matchMedia("(display-mode: standalone)") : null;
+  const standalone = (mq && mq.matches) || window.navigator.standalone === true;
+  if (standalone || localStorage.getItem(KEY)) return;
+
+  const isWeChat = /MicroMessenger/i.test(ua);
+  const isQQ = /\bQQ\/|QQBrowser/i.test(ua) && !isWeChat;
+  const isIOS = /iPad|iPhone|iPod/i.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const isAndroid = /Android/i.test(ua);
+
+  let msg = "";
+  if (isWeChat) {
+    msg = '微信里<b>没法添加图标</b>：点右上角「···」→ 选「在浏览器打开」，再按提示添加到主屏幕。';
+  } else if (isIOS) {
+    msg = '添加到手机桌面：点底部<b>「分享」</b>按钮 → 选<b>「添加到主屏幕」</b>→ 添加。装好后没网也能记账。';
+  } else if (isAndroid) {
+    msg = '添加到手机桌面：点右上角<b>「⋮」</b>→ 选<b>「添加到主屏幕」</b>（部分手机叫「安装应用」）。';
+  } else if (isQQ) {
+    msg = '请点右上角菜单 → 选<b>「在浏览器打开」</b>，再添加到主屏幕。';
+  } else {
+    return; // 电脑浏览器不提示
+  }
+  textEl.innerHTML = msg;
+  bar.style.display = "flex";
+
+  let deferred = null;
+  window.addEventListener("beforeinstallprompt", e => {
+    e.preventDefault();
+    deferred = e;
+    btn.style.display = "inline-block";
+    btn.textContent = "立即安装";
+  });
+  btn.onclick = async () => {
+    if (!deferred) return;
+    deferred.prompt();
+    try { await deferred.userChoice; } catch (e) {}
+    deferred = null;
+    btn.style.display = "none";
+    bar.style.display = "none";
+  };
+  closeBtn.onclick = () => {
+    bar.style.display = "none";
+    try { localStorage.setItem(KEY, "1"); } catch (e) {}
+  };
+})();
+</script>
 </body>
 </html>
