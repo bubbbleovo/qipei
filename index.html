@@ -227,7 +227,7 @@
 <div class="header">
   <div>
     <h1>🚚 嘉诺汽配 · 进销货记录</h1>
-    <div class="sub">一条记一批进货：进价、数量、商家；卖多少记多少，库存自动算｜数据存本机，建议定期导出备份<span id="verTag" style="opacity:.55"> · v19</span></div>
+    <div class="sub">卖多少记多少，库存自动算｜数据存本机，建议定期导出备份<span id="verTag" style="opacity:.55"> · v20</span></div>
   </div>
   <div class="header-actions">
     <button class="btn btn-outline" id="fsBtn" onclick="toggleFullscreen()" style="display:none">⛶ 全屏</button>
@@ -250,8 +250,7 @@
   <section id="tab-records">
     <div class="card">
       <div class="toolbar">
-        <button class="btn btn-primary" onclick="openRecordModal()">＋ 记一笔进货</button>
-        <button class="btn btn-primary" onclick="openBulkBuyModal()">📥 多商品进货</button>
+        <button class="btn btn-primary" onclick="openBulkBuyModal()">＋ 记进货</button>
         <button class="btn btn-success" onclick="openBulkSellModal()">🧾 多商品开单</button>
         <input type="text" id="fKeyword" placeholder="搜商品/商家/客户/备注" oninput="renderRecords()" style="flex:1;min-width:150px">
         <select id="fProduct" onchange="renderRecords()"><option value="">全部商品</option></select>
@@ -271,7 +270,7 @@
       <h2>📦 当前库存（按商品汇总）</h2>
       <div class="hint" style="margin-bottom:10px">库存 = 进货总数 − 已卖出总数。每批货可以分多次卖，卖多少扣多少。</div>
       <div class="toolbar">
-        <button class="btn btn-primary btn-sm" onclick="openBulkBuyModal()">📥 多商品进货</button>
+        <button class="btn btn-primary btn-sm" onclick="openBulkBuyModal()">＋ 记进货</button>
         <button class="btn btn-success btn-sm" onclick="openBulkSellModal()">🧾 多商品开单</button>
         <input type="text" id="stockSearch" placeholder="搜商品名称" oninput="renderStock()" style="flex:1;min-width:130px">
         <select id="stockProduct" onchange="renderStock()"><option value="">全部商品</option></select>
@@ -1149,7 +1148,7 @@ function renderRecords() {
         </div></td>
       </tr>`;
     }).join("")}
-    </tbody>` : `<tbody><tr><td colspan="10"><div class="empty-tip">还没有记录，点「＋ 记一笔进货」开始</div></td></tr></tbody>`;
+    </tbody>` : `<tbody><tr><td colspan="10"><div class="empty-tip">还没有记录，点「＋ 记进货」开始</div></td></tr></tbody>`;
 }
 
 function clearFilters() {
@@ -1647,7 +1646,7 @@ function openRecordModal(id) {
   const hasCost = (r.cost !== undefined && r.cost !== null && r.cost !== "");
   let costAuto = !hasCost;   // 进价由「上次进价」自动带出；用户手填过就不再覆盖
 
-  showModal(id ? "修改这批进货" : "记一笔进货", `
+  showModal(id ? "修改这批进货" : "记进货", `
     <div class="form-row"><label>进货日期 *</label><input type="date" id="r-date" value="${esc(r.date || today())}"></div>
     <div class="form-row"><label>商品名称 *</label>
       <input id="r-product" list="dl-product" value="${esc(r.product || "")}" placeholder="如：机油滤芯（大众朗逸）">
@@ -1768,7 +1767,7 @@ function openBulkBuyModal() {
   const prodOpts = productsInUse().map(p => `<option value="${esc(p)}">`).join("");
   const supOpts = suppliersInUse().map(s => `<option value="${esc(s)}">`).join("");
 
-  showModal("多商品进货 · 一次进好几种货", `
+  showModal("记进货 · 一次可以记好几种", `
     <div class="form-grid">
       <div class="form-row"><label>进货日期 *</label><input type="date" id="bb-date" value="${today()}"></div>
       <div class="form-row"><label>进货商家（都会记上）</label>
@@ -2083,7 +2082,7 @@ function bulkStocks() {
 
 function openBulkSellModal(preCustomer) {
   const stocks = bulkStocks();
-  if (!stocks.length) { alert("当前没有可卖的商品（库存都是 0）。\n\n先在「＋ 记一笔进货」里记进货，再来卖。"); return; }
+  if (!stocks.length) { alert("当前没有可卖的商品（库存都是 0）。\n\n先点「＋ 记进货」记进货，再来卖。"); return; }
   bulkCtx = { paidTouched: false };
   const rows = stocks.map(s => {
     const lp = lastPriceOf(s.product);
