@@ -175,9 +175,9 @@
   .slip-foot .row b { min-width: 96px; text-align: right; }
   .slip-sign { display: flex; justify-content: space-between; gap: 20px; margin-top: 36px; font-size: 13px; color: #374151; }
   .slip-sign span { border-top: 1px solid #9ca3af; padding-top: 4px; min-width: 130px; }
-  .slip-biz { margin-top: 20px; font-size: 12.5px; line-height: 1.9; color: #111827; }
+  .slip-biz { margin-top: 20px; font-size: 14.5px; line-height: 1.9; color: #111827; }
   .slip-biz div { margin-bottom: 1px; }
-  .slip-note { margin-top: 20px; font-size: 12px; color: #6b7280; border-top: 1px dashed #d1d5db; padding-top: 8px; }
+  .slip-note { margin-top: 20px; font-size: 14px; color: #6b7280; border-top: 1px dashed #d1d5db; padding-top: 8px; }
   /* 送货单保存图片 */
   .img-overlay { display: none; position: fixed; inset: 0; background: #111827; overflow: auto; z-index: 320; -webkit-overflow-scrolling: touch; }
   .img-overlay.show { display: block; }
@@ -204,7 +204,7 @@
 <div class="header">
   <div>
     <h1>🚚 嘉诺汽配 · 进销货记录</h1>
-    <div class="sub">一条记一批进货：进价、数量、商家；卖多少记多少，库存自动算｜数据存本机，建议定期导出备份<span id="verTag" style="opacity:.55"> · v16</span></div>
+    <div class="sub">一条记一批进货：进价、数量、商家；卖多少记多少，库存自动算｜数据存本机，建议定期导出备份<span id="verTag" style="opacity:.55"> · v17</span></div>
   </div>
   <div class="header-actions">
     <button class="btn btn-outline" id="fsBtn" onclick="toggleFullscreen()" style="display:none">⛶ 全屏</button>
@@ -248,8 +248,8 @@
       <div class="hint" style="margin-bottom:10px">库存 = 进货总数 − 已卖出总数。每批货可以分多次卖，卖多少扣多少。</div>
       <div class="toolbar">
         <button class="btn btn-success btn-sm" onclick="openBulkSellModal()">🧾 多商品开单</button>
-        <select id="stockProduct" onchange="renderStock()"><option value="">全部商品</option></select>
         <input type="text" id="stockSearch" placeholder="搜商品名称" oninput="renderStock()" style="flex:1;min-width:130px">
+        <select id="stockProduct" onchange="renderStock()"><option value="">全部商品</option></select>
         <select id="stockState" onchange="renderStock()" title="按有没有货筛选">
           <option value="">全部商品</option>
           <option value="in">还有货</option>
@@ -278,6 +278,7 @@
         <button data-view="month" onclick="setSalesView('month')">按月份</button>
       </div>
       <div class="toolbar">
+        <input type="text" id="sfKeyword" placeholder="搜客户 / 商品 / 单号" oninput="renderSales()" style="flex:1;min-width:150px">
         <select id="sfQuick" onchange="applyQuickRange(this.value)">
           <option value="">全部时间</option>
           <option value="30">近 30 天</option>
@@ -288,7 +289,6 @@
         <input type="date" id="sfTo" onchange="renderSales()" title="卖出日期止">
         <select id="sfCustomer" onchange="renderSales()"><option value="">全部客户</option></select>
         <select id="sfProduct" onchange="renderSales()"><option value="">全部商品</option></select>
-        <input type="text" id="sfKeyword" placeholder="搜客户 / 商品 / 单号" oninput="renderSales()" style="flex:1;min-width:130px">
         <label class="chk-label"><input type="checkbox" id="sfDebtOnly" onchange="renderSales()"> 只看有欠款</label>
         <button class="btn btn-outline btn-sm" onclick="clearSalesFilters()">重置</button>
         <button class="btn btn-outline btn-sm" onclick="exportSalesCsv()">⬇ 导出表格</button>
@@ -822,7 +822,7 @@ function renderSales() {
   if (box) {
     box.innerHTML = `<div class="sum-bar">
       <span>笔数 <b>${s.n}</b></span>
-      <span>件数 <b>${qtyText(s.qty)}</b></span>
+      <span>个数 <b>${qtyText(s.qty)}</b></span>
       <span>销售额 <b>${money(s.total)}</b></span>
       <span>已收 <b style="color:#16a34a">${money(s.paid)}</b></span>
       <span>欠款 <b style="color:${s.debt > 0.005 ? "#dc2626" : "#1e3a5f"}">${money(s.debt)}</b></span>
@@ -859,13 +859,13 @@ function renderSales() {
       if (x.date > o.last) o.last = x.date;
     });
     const groups = Object.values(map).sort((a, b) => b.total - a.total);
-    const head = [{ t: "客户" }, { t: "笔数", cls: "num" }, { t: "件数", cls: "num" }, { t: "销售额", cls: "num" },
+    const head = [{ t: "客户" }, { t: "笔数", cls: "num" }, { t: "个数", cls: "num" }, { t: "销售额", cls: "num" },
       { t: "已收", cls: "num" }, { t: "欠款", cls: "num" }, { t: "最近一次", cls: "num" }, { t: "操作" }];
     const rows = groups.map(g => ({
       cells: [
         { l: "客户", v: esc(g.name), cls: "first" },
         { l: "笔数", v: g.n, cls: "num" },
-        { l: "件数", v: qtyText(g.qty), cls: "num" },
+        { l: "个数", v: qtyText(g.qty), cls: "num" },
         { l: "销售额", v: money(g.total), cls: "num" },
         { l: "已收", v: money(g.paid), cls: "num paid-num" },
         { l: "欠款", v: g.debt > 0.005 ? money(g.debt) : "—", cls: "num " + (g.debt > 0.005 ? "debt-num" : "muted") },
@@ -883,18 +883,18 @@ function renderSales() {
       o.custs.add(x.customer);
     });
     const groups = Object.values(map).sort((a, b) => b.profit - a.profit);
-    const head = [{ t: "商品" }, { t: "卖出件数", cls: "num" }, { t: "均价", cls: "num" }, { t: "销售额", cls: "num" },
+    const head = [{ t: "商品" }, { t: "卖出个数", cls: "num" }, { t: "均价", cls: "num" }, { t: "销售额", cls: "num" },
       { t: "成本", cls: "num" }, { t: "毛利", cls: "num" }, { t: "毛利率", cls: "num" }, { t: "剩余库存", cls: "num" }, { t: "操作" }];
     const rows = groups.map(g => ({
       cells: [
         { l: "商品", v: esc(g.name), cls: "first" },
-        { l: "卖出件数", v: qtyText(g.qty), cls: "num" },
+        { l: "卖出个数", v: qtyText(g.qty), cls: "num" },
         { l: "均价", v: money(g.qty ? g.total / g.qty : 0), cls: "num" },
         { l: "销售额", v: money(g.total), cls: "num" },
         { l: "成本", v: money(g.cost), cls: "num" },
         { l: "毛利", v: money(g.profit), cls: "num", h: `<span style="color:${g.profit >= 0 ? "#16a34a" : "#dc2626"};font-weight:700">${money(g.profit)}</span>` },
         { l: "毛利率", v: rateText(g.profit, g.total), cls: "num" },
-        { l: "剩余库存", v: qtyText(db.records.filter(r => r.product === g.name).reduce((a, r) => a + stockOf(r), 0)) + " 件", cls: "num" }
+        { l: "剩余库存", v: qtyText(db.records.filter(r => r.product === g.name).reduce((a, r) => a + stockOf(r), 0)) + " 个", cls: "num" }
       ],
       acts: `<a class="mini-link" data-prod="${esc(g.name)}" onclick="viewProductFlow(this.dataset.prod)">看流水</a>`
     }));
@@ -907,13 +907,13 @@ function renderSales() {
       o.n += 1; o.qty += x.qty; o.total += x.total; o.cost += x.costAmt; o.profit += x.profit;
     });
     const groups = Object.values(map).sort((a, b) => String(b.m).localeCompare(String(a.m)));
-    const head = [{ t: "月份" }, { t: "笔数", cls: "num" }, { t: "件数", cls: "num" }, { t: "销售额", cls: "num" },
+    const head = [{ t: "月份" }, { t: "笔数", cls: "num" }, { t: "个数", cls: "num" }, { t: "销售额", cls: "num" },
       { t: "成本", cls: "num" }, { t: "毛利", cls: "num" }, { t: "毛利率", cls: "num" }];
     const rows = groups.map(g => ({
       cells: [
         { l: "月份", v: esc(g.m), cls: "first" },
         { l: "笔数", v: g.n, cls: "num" },
-        { l: "件数", v: qtyText(g.qty), cls: "num" },
+        { l: "个数", v: qtyText(g.qty), cls: "num" },
         { l: "销售额", v: money(g.total), cls: "num" },
         { l: "成本", v: money(g.cost), cls: "num" },
         { l: "毛利", v: money(g.profit), cls: "num", h: `<span style="color:${g.profit >= 0 ? "#16a34a" : "#dc2626"};font-weight:700">${money(g.profit)}</span>` },
@@ -924,7 +924,7 @@ function renderSales() {
       cells: [
         { l: "合计", v: "合计", cls: "first" },
         { l: "笔数", v: s.n, cls: "num" },
-        { l: "件数", v: qtyText(s.qty), cls: "num" },
+        { l: "个数", v: qtyText(s.qty), cls: "num" },
         { l: "销售额", v: money(s.total), cls: "num" },
         { l: "成本", v: money(s.cost), cls: "num" },
         { l: "毛利", v: money(s.profit), cls: "num" },
@@ -957,7 +957,7 @@ function salesCsvRows() {
       o.n++; o.qty += x.qty; o.total += x.total; o.paid += x.paid; o.debt += x.debt;
       if (x.date > o.last) o.last = x.date;
     });
-    const rows = [["客户", "笔数", "件数", "销售额", "已收", "欠款", "最近一次"]];
+    const rows = [["客户", "笔数", "个数", "销售额", "已收", "欠款", "最近一次"]];
     Object.values(map).sort((a, b) => b.total - a.total).forEach(g =>
       rows.push([g.name, g.n, qtyText(g.qty), g.total.toFixed(2), g.paid.toFixed(2), g.debt.toFixed(2), g.last]));
     return rows;
@@ -968,7 +968,7 @@ function salesCsvRows() {
       const o = map[x.product] || (map[x.product] = { name: x.product, qty: 0, total: 0, cost: 0, profit: 0 });
       o.qty += x.qty; o.total += x.total; o.cost += x.costAmt; o.profit += x.profit;
     });
-    const rows = [["商品", "卖出件数", "均价", "销售额", "成本", "毛利", "毛利率", "剩余库存"]];
+    const rows = [["商品", "卖出个数", "均价", "销售额", "成本", "毛利", "毛利率", "剩余库存"]];
     Object.values(map).sort((a, b) => b.profit - a.profit).forEach(g =>
       rows.push([g.name, qtyText(g.qty), (g.qty ? g.total / g.qty : 0).toFixed(2), g.total.toFixed(2), g.cost.toFixed(2),
         g.profit.toFixed(2), rateText(g.profit, g.total), qtyText(db.records.filter(r => r.product === g.name).reduce((a, r) => a + stockOf(r), 0))]));
@@ -980,7 +980,7 @@ function salesCsvRows() {
     const o = map[m] || (map[m] = { m: m, n: 0, qty: 0, total: 0, cost: 0, profit: 0 });
     o.n++; o.qty += x.qty; o.total += x.total; o.cost += x.costAmt; o.profit += x.profit;
   });
-  const rows = [["月份", "笔数", "件数", "销售额", "成本", "毛利", "毛利率"]];
+  const rows = [["月份", "笔数", "个数", "销售额", "成本", "毛利", "毛利率"]];
   Object.values(map).sort((a, b) => String(b.m).localeCompare(String(a.m))).forEach(g =>
     rows.push([g.m, g.n, qtyText(g.qty), g.total.toFixed(2), g.cost.toFixed(2), g.profit.toFixed(2), rateText(g.profit, g.total)]));
   return rows;
@@ -1048,7 +1048,7 @@ function salesCell(r) {
     const link = s.order
       ? `<a class="mini-link" data-order="${esc(s.order)}" onclick="printOrderSlip(this.dataset.order)">整单</a><span class="order-tag">${esc(String(s.order).slice(-3))}</span>`
       : `<a class="mini-link" onclick="printSlip(${r.id},${s.id})">送货单</a>`;
-    return `<div class="sale-line">${esc(s.customer || "未填客户")} <b>${qtyText(s.qty)}</b>件 × ${money(s.price)} <span class="muted">${esc(s.date || "")}</span>${tag}${link}<a class="mini-link" onclick="openEditSaleModal(${r.id},${s.id})">改</a><a class="mini-link del" onclick="delSale(${r.id},${s.id})">删</a></div>`;
+    return `<div class="sale-line">${esc(s.customer || "未填客户")} <b>${qtyText(s.qty)}</b>个 × ${money(s.price)} <span class="muted">${esc(s.date || "")}</span>${tag}${link}<a class="mini-link" onclick="openEditSaleModal(${r.id},${s.id})">改</a><a class="mini-link del" onclick="delSale(${r.id},${s.id})">删</a></div>`;
   }).join("");
 }
 
@@ -1068,9 +1068,9 @@ function renderRecords() {
 
   document.getElementById("sumBar").innerHTML = `<div class="sum-bar">
     ${head}<span>共 <b>${list.length}</b> 批</span>
-    <span>进货 <b>${qtyText(inQty)}</b> 件 / ${money(inAmt)}</span>
-    <span>卖出 <b>${qtyText(soldQty)}</b> 件 / ${money(soldAmt)}</span>
-    <span>在库 <b>${qtyText(stockQty)}</b> 件</span>
+    <span>进货 <b>${qtyText(inQty)}</b> 个 / ${money(inAmt)}</span>
+    <span>卖出 <b>${qtyText(soldQty)}</b> 个 / ${money(soldAmt)}</span>
+    <span>在库 <b>${qtyText(stockQty)}</b> 个</span>
     <span>毛利 <span class="profit">${money(profit)}</span></span>
     ${debt > 0.005 ? `<span>未收 <b class="debt-num">${money(debt)}</b></span>` : ""}
   </div>`;
@@ -1150,9 +1150,9 @@ function renderStock() {
 
   document.getElementById("stockSum").innerHTML = `<div class="sum-bar">
     ${head}<span>商品 <b>${stats.length}</b>${stats.length !== allCount ? ` / ${allCount}` : ""} 种</span>
-    <span>在库合计 <b>${qtyText(tQty)}</b> 件</span>
+    <span>在库合计 <b>${qtyText(tQty)}</b> 个</span>
     <span>库存成本 <b>${money(tVal)}</b></span>
-    <span>已卖出 <b>${qtyText(tSold)}</b> 件</span>
+    <span>已卖出 <b>${qtyText(tSold)}</b> 个</span>
   </div>`;
 
   if (!stats.length) {
@@ -1165,14 +1165,14 @@ function renderStock() {
   }
 
   document.getElementById("stockTable").innerHTML = `
-    <thead><tr><th>商品</th><th class="num">在库件数</th><th class="num">进货均价</th><th class="num">库存成本</th><th class="num">累计进货</th><th class="num">已卖出</th><th>操作</th></tr></thead>
+    <thead><tr><th>商品</th><th class="num">在库个数</th><th class="num">进货均价</th><th class="num">库存成本</th><th class="num">累计进货</th><th class="num">已卖出</th><th>操作</th></tr></thead>
     <tbody>${stats.map(s => `<tr>
       <td><b>${esc(s.product)}</b><div class="hint">${s.batches} 批${s.stockQty <= 0 ? " · 已卖完" : ""}</div></td>
       <td class="num"><b style="color:${s.stockQty > 0 ? "#1e3a5f" : "#9ca3af"}">${qtyText(s.stockQty)}</b></td>
       <td class="num">${money(s.inQty ? s.inValue / s.inQty : 0)}</td>
       <td class="num">${money(s.stockValue)}</td>
-      <td class="num">${qtyText(s.inQty)} 件</td>
-      <td class="num">${qtyText(s.soldQty)} 件</td>
+      <td class="num">${qtyText(s.inQty)} 个</td>
+      <td class="num">${qtyText(s.soldQty)} 个</td>
       <td><div class="row-actions">
         <button class="btn btn-outline btn-sm" data-product="${esc(s.product)}" onclick="showProductRecords(this.dataset.product)">看记录</button>
       </div></td>
@@ -1264,7 +1264,7 @@ function csDel(rid, sid) {
   const s = (r.sales || []).find(x => x.id === Number(sid));
   if (!s) return;
   const who = custKey(s);
-  if (!confirm(`确定删除这笔卖出记录吗？\n\n${who} · ${r.product} · ${qtyText(s.qty)} 件 × ${money(s.price)}\n\n删掉后库存会加回去，欠款和汇总也会一起变。`)) return;
+  if (!confirm(`确定删除这笔卖出记录吗？\n\n${who} · ${r.product} · ${qtyText(s.qty)} 个 × ${money(s.price)}\n\n删掉后库存会加回去，欠款和汇总也会一起变。`)) return;
   r.sales = (r.sales || []).filter(x => x.id !== Number(sid));
   save();
   if (!customerSales(csCtx.name).length && !db.customers.some(c => c.name === csCtx.name)) {
@@ -1295,7 +1295,7 @@ function csItemHtml(x) {
       <span class="cs-amt">${money(x.amount)}</span>
     </div>
     <div class="cs-l2">
-      <span>${qtyText(s.qty)} 件 × ${money(s.price)}</span>
+      <span>${qtyText(s.qty)} 个 × ${money(s.price)}</span>
       ${money2.join("")}
       ${orderInfo}
     </div>
@@ -1365,7 +1365,7 @@ function renderCustSales() {
   const profit = rows.reduce((a, x) => a + (Number(x.s.qty) || 0) * ((Number(x.s.price) || 0) - (Number(x.r.cost) || 0)), 0);
   const sumEl = document.getElementById("custSalesSum");
   if (sumEl) sumEl.innerHTML = `<div class="sum-bar">
-    <span>${filtered ? "筛选出" : "共"} <b>${rows.length}</b> 笔 / <b>${qtyText(qty)}</b> 件</span>
+    <span>${filtered ? "筛选出" : "共"} <b>${rows.length}</b> 笔 / <b>${qtyText(qty)}</b> 个</span>
     <span>销售额 <b>${money(amt)}</b></span>
     <span>已收 <b class="paid-num">${money(paid)}</b></span>
     <span>未收欠款 <b class="${debt > 0.005 ? "debt-num" : ""}">${money(debt)}</b></span>
@@ -1426,7 +1426,7 @@ function renderCustomers() {
   </div>`;
 
   document.getElementById("customersTable").innerHTML = rows.length ? `
-    <thead><tr><th>客户名称</th><th>电话</th><th class="num">购买笔数</th><th class="num">累计件数</th><th class="num">累计金额</th><th class="num">未收欠款</th><th>最近购买</th><th>备注</th><th>操作</th></tr></thead>
+    <thead><tr><th>客户名称</th><th>电话</th><th class="num">购买笔数</th><th class="num">累计个数</th><th class="num">累计金额</th><th class="num">未收欠款</th><th>最近购买</th><th>备注</th><th>操作</th></tr></thead>
     <tbody>${rows.map(o => {
       const c = info[o.name] || {};
       const on = csCtx.name === o.name;
@@ -1464,19 +1464,19 @@ function renderDash() {
   const paid = all.reduce((s, r) => s + paidOf(r), 0);
 
   document.getElementById("statsGrid").innerHTML = [
-    ["累计进货", qtyText(inQty) + " 件 / " + money(inAmt), ""],
-    ["累计销售", qtyText(soldQty) + " 件 / " + money(soldAmt), "green"],
+    ["累计进货", qtyText(inQty) + " 个 / " + money(inAmt), ""],
+    ["累计销售", qtyText(soldQty) + " 个 / " + money(soldAmt), "green"],
     ["累计毛利", money(profit), profit >= 0 ? "green" : "red"],
     ["已收货款", money(paid), "green"],
     ["未收欠款", money(debt), debt > 0.005 ? "red" : ""],
-    ["在库库存", qtyText(stockQty) + " 件", ""],
+    ["在库库存", qtyText(stockQty) + " 个", ""],
     ["库存成本", money(stockValue), ""],
     ["毛利率", soldAmt > 0 ? ((profit / soldAmt) * 100).toFixed(1) + "%" : "-", ""]
   ].map(([l, v, c]) => `<div class="stat"><div class="label">${l}</div><div class="value ${c}">${v}</div></div>`).join("");
 
   const stats = productStats().sort((a, b) => b.profit - a.profit);
   document.getElementById("productTable").innerHTML = stats.length ? `
-    <thead><tr><th>商品</th><th class="num">进货件数</th><th class="num">进货均价</th><th class="num">卖出件数</th><th class="num">销售均价</th><th class="num">在库</th><th class="num">毛利</th><th></th></tr></thead>
+    <thead><tr><th>商品</th><th class="num">进货个数</th><th class="num">进货均价</th><th class="num">卖出个数</th><th class="num">销售均价</th><th class="num">在库</th><th class="num">毛利</th><th></th></tr></thead>
     <tbody>${stats.map(s => `<tr>
       <td><b>${esc(s.product)}</b></td>
       <td class="num">${qtyText(s.inQty)}</td>
@@ -1516,7 +1516,7 @@ function renderMonthly() {
 
   document.getElementById("monthTable").innerHTML = rows.length ? `
     <thead><tr>
-      <th>月份</th><th class="num">卖出笔数</th><th class="num">卖出件数</th>
+      <th>月份</th><th class="num">卖出笔数</th><th class="num">卖出个数</th>
       <th class="num">销售额</th><th class="num">成本</th><th class="num">毛利</th><th class="num">毛利率</th>
       <th class="num">已收</th><th class="num">欠款</th><th class="num">当月进货</th><th>毛利占比</th>
     </tr></thead>
@@ -1588,20 +1588,20 @@ function openRecordModal(id) {
     </div>
     <div class="form-grid">
       <div class="form-row"><label>进货数量 *</label><input type="number" id="r-qty" min="1" step="1" value="${r.qty || 1}"></div>
-      <div class="form-row"><label>进货单价（¥/件）</label><input type="number" id="r-cost" min="0" step="0.01" value="${r.cost != null && r.cost !== "" ? r.cost : (lastCost || "")}" placeholder="0.00"></div>
+      <div class="form-row"><label>进货单价（¥/个）</label><input type="number" id="r-cost" min="0" step="0.01" value="${r.cost != null && r.cost !== "" ? r.cost : (lastCost || "")}" placeholder="0.00"></div>
     </div>
     <div class="form-row"><label>进货商家（从哪里进的）</label>
       <input id="r-supplier" list="dl-supplier" value="${esc(r.supplier || "")}" placeholder="商家名称">
       <datalist id="dl-supplier">${supOpts}</datalist>
     </div>
     <div class="form-row"><label>备注</label><input id="r-note" value="${esc(r.note || "")}" placeholder="如：运费、批次、适配车型"></div>
-    <div class="hint" id="recordHint">${id && sold > 0 ? `这批已经卖出 ${qtyText(sold)} 件，进货数量不能改到比它小。` : "记好之后，卖出去的时候点「卖」，卖多少扣多少库存。"}</div>
+    <div class="hint" id="recordHint">${id && sold > 0 ? `这批已经卖出 ${qtyText(sold)} 个，进货数量不能改到比它小。` : "记好之后，卖出去的时候点「卖」，卖多少扣多少库存。"}</div>
   `, () => {
     const product = val("r-product"), qty = numv("r-qty");
     if (!val("r-date")) { alert("请选择进货日期"); return false; }
     if (!product) { alert("请填写商品名称"); return false; }
     if (!(qty > 0)) { alert("请填写正确的进货数量"); return false; }
-    if (id && qty < sold) { alert(`这批已经卖出 ${qtyText(sold)} 件，进货数量不能小于 ${qtyText(sold)}`); return false; }
+    if (id && qty < sold) { alert(`这批已经卖出 ${qtyText(sold)} 个，进货数量不能小于 ${qtyText(sold)}`); return false; }
 
     const rec = {
       date: val("r-date"), product: product, qty: qty,
@@ -1626,8 +1626,8 @@ function openSellModal(id) {
 
   showModal("卖出一笔 · " + r.product, `
     <div class="batch-info">
-      这批：${esc(r.date)} 进的 <b>${qtyText(r.qty)}</b> 件，进价 ${money(r.cost)}/件${r.supplier ? "，来自 " + esc(r.supplier) : ""}<br>
-      已卖 <b>${qtyText(sold)}</b> 件，还剩 <b style="color:${stock > 0 ? "#16a34a" : "#dc2626"}">${qtyText(stock)}</b> 件
+      这批：${esc(r.date)} 进的 <b>${qtyText(r.qty)}</b> 个，进价 ${money(r.cost)}/个${r.supplier ? "，来自 " + esc(r.supplier) : ""}<br>
+      已卖 <b>${qtyText(sold)}</b> 个，还剩 <b style="color:${stock > 0 ? "#16a34a" : "#dc2626"}">${qtyText(stock)}</b> 个
     </div>
     ${sales.length ? `
       <div class="hint" style="margin:12px 0 5px">已卖出明细（点「删」可删掉记错的）</div>
@@ -1654,7 +1654,7 @@ function openSellModal(id) {
     <div style="margin-top:14px"></div>
     <div class="form-grid">
       <div class="form-row"><label>这次卖出数量 *</label><input type="number" id="s-qty" min="1" step="1" value="${stock > 0 ? stock : 1}"></div>
-      <div class="form-row"><label>卖出单价（¥/件）*</label><input type="number" id="s-price" min="0" step="0.01" value="${last ? last.price : ""}" placeholder="0.00"></div>
+      <div class="form-row"><label>卖出单价（¥/个）*</label><input type="number" id="s-price" min="0" step="0.01" value="${last ? last.price : ""}" placeholder="0.00"></div>
     </div>
     <div class="form-row"><label>卖给谁（客户）*</label>
       <input id="s-customer" list="dl-cust" value="${last ? esc(last.customer || "") : ""}" placeholder="客户名称">
@@ -1673,7 +1673,7 @@ function openSellModal(id) {
   `, () => {
     const q = numv("s-qty"), p = numv("s-price"), cust = val("s-customer");
     if (!(q > 0)) { alert("请填写卖出数量"); return false; }
-    if (q > stock + 1e-9) { alert(`这批最多还能卖 ${qtyText(stock)} 件`); return false; }
+    if (q > stock + 1e-9) { alert(`这批最多还能卖 ${qtyText(stock)} 个`); return false; }
     if (!cust) { alert("请填写客户名称（客户记录单要用）"); return false; }
     const total = q * p;
     const paidEl = document.getElementById("s-paid");
@@ -1748,13 +1748,13 @@ function openEditSaleModal(recordId, saleId) {
 
   showModal("修改卖出记录 · " + r.product, `
     <div class="batch-info">
-      这批：${esc(r.date)} 进的 <b>${qtyText(r.qty)}</b> 件，进价 ${money(r.cost)}/件${r.supplier ? "，来自 " + esc(r.supplier) : ""}<br>
-      这笔原来卖了 <b>${qtyText(s.qty)}</b> 件 × ${money(s.price)}。改完库存、欠款、利润都会自动重算。
+      这批：${esc(r.date)} 进的 <b>${qtyText(r.qty)}</b> 个，进价 ${money(r.cost)}/个${r.supplier ? "，来自 " + esc(r.supplier) : ""}<br>
+      这笔原来卖了 <b>${qtyText(s.qty)}</b> 个 × ${money(s.price)}。改完库存、欠款、利润都会自动重算。
     </div>
     ${ordSales.length > 1 ? `<div class="hint" style="background:#fffbeb;border-color:#fde68a;color:#92400e;margin-top:8px">这笔属于整单 <b>${esc(s.order)}</b>（共 ${ordSales.length} 笔）：改客户/日期会同步到整单其他几笔，数量、售价只改这一笔。</div>` : ""}
     <div class="form-grid" style="margin-top:12px">
       <div class="form-row"><label>卖出数量 *</label><input type="number" id="e-qty" min="1" step="1" value="${Number(s.qty) || 0}"></div>
-      <div class="form-row"><label>卖出单价（¥/件）*</label><input type="number" id="e-price" min="0" step="0.01" value="${Number(s.price) || 0}"></div>
+      <div class="form-row"><label>卖出单价（¥/个）*</label><input type="number" id="e-price" min="0" step="0.01" value="${Number(s.price) || 0}"></div>
     </div>
     <div class="form-row"><label>卖给谁（客户）*</label>
       <input id="e-customer" list="dl-cust-e" value="${esc(s.customer || "")}" placeholder="客户名称">
@@ -1773,7 +1773,7 @@ function openEditSaleModal(recordId, saleId) {
   `, () => {
     const q = numv("e-qty"), p = numv("e-price"), cust = val("e-customer");
     if (!(q > 0)) { alert("请填写卖出数量"); return false; }
-    if (q > maxQty + 1e-9) { alert(`这批最多只能卖 ${qtyText(maxQty)} 件（已经扣掉其他几笔卖出）`); return false; }
+    if (q > maxQty + 1e-9) { alert(`这批最多只能卖 ${qtyText(maxQty)} 个（已经扣掉其他几笔卖出）`); return false; }
     if (p < 0) { alert("售价不能是负数"); return false; }
     if (!cust) { alert("请填写客户名称（客户记录单要用）"); return false; }
     const total = q * p;
@@ -1820,7 +1820,7 @@ function updateEditHint() {
   if (!(q > 0)) { el.textContent = "填好数量和售价，这里自动算这一笔的毛利"; return; }
   const profit = q * (p - cost);
   el.innerHTML = `本笔：应收 <b>${money(total)}</b>，成本 <b>${money(q * cost)}</b>，毛利 <b style="color:${profit >= 0 ? "#16a34a" : "#dc2626"}">${money(profit)}</b>`
-    + (q > maxQty + 1e-9 ? `<br><b class="debt-num">这批最多只能卖 ${qtyText(maxQty)} 件</b>` : "")
+    + (q > maxQty + 1e-9 ? `<br><b class="debt-num">这批最多只能卖 ${qtyText(maxQty)} 个</b>` : "")
     + "<br>"
     + (debt > 0.005
       ? `实收 <b class="paid-num">${money(paid)}</b>，<b class="debt-num">还欠 ${money(debt)}</b>`
@@ -1851,7 +1851,7 @@ function openBulkSellModal(preCustomer) {
     const lp = lastPriceOf(s.product);
     return `<div class="pick-row" data-product="${esc(s.product)}">
       <input type="checkbox" class="pick-chk">
-      <div class="nm">${esc(s.product)}<span class="sm">可卖 ${qtyText(s.stockQty)} 件 · 进价均价 ${money(s.inQty ? s.inValue / s.inQty : 0)}</span></div>
+      <div class="nm">${esc(s.product)}<span class="sm">可卖 ${qtyText(s.stockQty)} 个 · 进价均价 ${money(s.inQty ? s.inValue / s.inQty : 0)}</span></div>
       <input type="number" class="pick-qty" min="1" step="1" inputmode="numeric" value="1">
       <input type="number" class="pick-price" min="0" step="0.01" inputmode="decimal" value="${lp ? lp : ""}" placeholder="0.00">
     </div>`;
@@ -1902,7 +1902,7 @@ function openBulkSellModal(preCustomer) {
     for (const pk of picks) {
       if (!(pk.qty > 0)) { alert(`「${pk.product}」的卖出数量要大于 0`); return false; }
       if (pk.qty > (stockMap[pk.product] || 0) + 1e-9) {
-        alert(`「${pk.product}」最多只能卖 ${qtyText(stockMap[pk.product] || 0)} 件`);
+        alert(`「${pk.product}」最多只能卖 ${qtyText(stockMap[pk.product] || 0)} 个`);
         return false;
       }
     }
@@ -1968,7 +1968,7 @@ function refreshBulkHint() {
   const paid = raw === "" ? s.total : Math.max(0, Math.min(parseFloat(raw) || 0, s.total));
   const debt = Math.round((s.total - paid) * 100) / 100;
   if (!s.n) { el.textContent = "还没有勾选商品：勾上之后再填数量和卖价。"; return; }
-  el.innerHTML = `已选 <b>${s.n}</b> 种，共 <b>${qtyText(s.qty)}</b> 件，应收 <b>${money(s.total)}</b><br>`
+  el.innerHTML = `已选 <b>${s.n}</b> 种，共 <b>${qtyText(s.qty)}</b> 个，应收 <b>${money(s.total)}</b><br>`
     + (debt > 0.005
       ? `实收 <b class="paid-num">${money(paid)}</b>，<b class="debt-num">还欠 ${money(debt)}</b>（之后在「客户记录」里点「收款」登记）`
       : `实收 <b class="paid-num">${money(paid)}</b> · 已结清 ✓`);
@@ -2365,7 +2365,7 @@ function printOrderSlip(orderNo) {
     </table>
     ${slipBizBlock()}
   `;
-  openPrint(`共 ${lines.length} 种商品、${qtyText(qtyAll)} 件，合计 ${money(total)}。可点「保存图片」发给客户。`);
+  openPrint(`共 ${lines.length} 种商品、${qtyText(qtyAll)} 个，合计 ${money(total)}。可点「保存图片」发给客户。`);
 }
 
 /* ================= 送货单存成图片（Canvas 手绘，不依赖网络） ================= */
@@ -2437,7 +2437,7 @@ function renderSlipImage(d) {
     return s + "…";
   };
 
-  const bizFont = F(12.5);
+  const bizFont = F(14.5);
   const bizLines = [SHOP_BIZ, SHOP_ADDR, SHOP_TEL].reduce((acc, t) => acc.concat(wrapText(t, inner - 4, bizFont)), []);
 
   const headH = 34 + (d.shopPhone ? 18 : 0) + 28 + 18 + 44;
@@ -2446,9 +2446,9 @@ function renderSlipImage(d) {
   const tableTop = PAD + headH;
   const tableBottom = tableTop + headH2 + rows * rowH + footH;
   const bizTop = tableBottom + 22;
-  const signY = bizTop + bizLines.length * 23 + 40;
-  const noteY = signY + 42;
-  const H = noteY + 34 + PAD;
+  const signY = bizTop + bizLines.length * 26 + 40;
+  const noteY = signY + 44;
+  const H = noteY + 36 + PAD;
 
   const cv = document.createElement("canvas");
   cv.width = W * S;
@@ -2518,7 +2518,7 @@ function renderSlipImage(d) {
   put(money(d.total), xs[5] - 10, footY, F(13, 700), "#111827", "right");
 
   // 业务范围 / 地址 / 电话
-  bizLines.forEach((ln, i) => put(ln, PAD, bizTop + i * 23, bizFont, "#111827"));
+  bizLines.forEach((ln, i) => put(ln, PAD, bizTop + i * 26, bizFont, "#111827"));
 
   // 签字栏
   const signW = (inner - 48) / 3;
@@ -2536,7 +2536,7 @@ function renderSlipImage(d) {
   if (ctx.setLineDash) ctx.setLineDash([4, 4]);
   ctx.beginPath(); ctx.moveTo(PAD, noteY); ctx.lineTo(W - PAD, noteY); ctx.stroke();
   if (ctx.setLineDash) ctx.setLineDash([]);
-  put(SLIP_NOTE, PAD, noteY + 16, F(12), "#6b7280");
+  put(SLIP_NOTE, PAD, noteY + 17, F(14), "#6b7280");
 
   try { return cv.toDataURL("image/png"); } catch (e) { return ""; }
 }
