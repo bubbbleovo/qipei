@@ -105,6 +105,29 @@
   .pick-row .nm { font-size: 13px; font-weight: 600; color: #1e3a5f; line-height: 1.35; word-break: break-all; }
   .pick-row .nm .sm { display: block; font-weight: 400; font-size: 11px; color: #9ca3af; margin-top: 1px; }
   .pick-row input[type=number] { width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; font-family: inherit; text-align: right; }
+  /* ===== 多商品进货（一行一个商品） ===== */
+  .buy-list { border: 1px solid #e5e7eb; border-radius: 8px; max-height: 320px; overflow: auto; -webkit-overflow-scrolling: touch; }
+  .buy-head, .buy-row { display: grid; grid-template-columns: 1fr 56px 72px 24px; gap: 6px; align-items: center; padding: 6px 8px; font-size: 12px; }
+  .buy-head { position: sticky; top: 0; z-index: 1; background: #f8fafc; color: #475569; font-weight: 600; border-bottom: 1px solid #e2e8f0; }
+  .buy-head span:nth-child(2), .buy-head span:nth-child(3) { text-align: right; }
+  .buy-row { border-bottom: 1px solid #f1f5f9; }
+  .buy-row:last-child { border-bottom: none; }
+  .buy-row input { width: 100%; padding: 7px 6px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; font-family: inherit; background: #fff; }
+  .buy-row input:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 2px rgba(37,99,235,.12); }
+  .buy-row input[type=number] { text-align: right; }
+  .buy-row .lpk { display: block; font-size: 11px; color: #9ca3af; margin-top: 2px; line-height: 1.3; }
+  .buy-row .lpk.hit { color: #16a34a; }
+  .buy-row .del { border: none; background: none; color: #dc2626; font-size: 14px; cursor: pointer; padding: 0; line-height: 1; opacity: .7; }
+  .buy-row .del:active { opacity: 1; }
+  .buy-total { font-size: 12px; color: #475569; margin-top: 8px; line-height: 1.7; }
+  .buy-total b { color: #1e3a5f; }
+  /* 轻提示 */
+  .toast { position: fixed; left: 50%; bottom: 26px; transform: translate(-50%, 12px); background: rgba(30,58,95,.95);
+    color: #fff; padding: 9px 16px; border-radius: 20px; font-size: 13px; z-index: 400; opacity: 0;
+    pointer-events: none; transition: opacity .22s, transform .22s; max-width: 86vw; text-align: center; }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+  /* 日期框整块可点 */
+  input[type=date] { cursor: pointer; }
   .order-tag { display: inline-block; background: #e0e7ff; color: #3730a3; border-radius: 6px; padding: 0 5px; font-size: 10px; font-weight: 700; margin-left: 4px; }
   /* ===== 客户销货记录 ===== */
   .cs-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
@@ -204,7 +227,7 @@
 <div class="header">
   <div>
     <h1>🚚 嘉诺汽配 · 进销货记录</h1>
-    <div class="sub">一条记一批进货：进价、数量、商家；卖多少记多少，库存自动算｜数据存本机，建议定期导出备份<span id="verTag" style="opacity:.55"> · v18</span></div>
+    <div class="sub">一条记一批进货：进价、数量、商家；卖多少记多少，库存自动算｜数据存本机，建议定期导出备份<span id="verTag" style="opacity:.55"> · v19</span></div>
   </div>
   <div class="header-actions">
     <button class="btn btn-outline" id="fsBtn" onclick="toggleFullscreen()" style="display:none">⛶ 全屏</button>
@@ -228,6 +251,7 @@
     <div class="card">
       <div class="toolbar">
         <button class="btn btn-primary" onclick="openRecordModal()">＋ 记一笔进货</button>
+        <button class="btn btn-primary" onclick="openBulkBuyModal()">📥 多商品进货</button>
         <button class="btn btn-success" onclick="openBulkSellModal()">🧾 多商品开单</button>
         <input type="text" id="fKeyword" placeholder="搜商品/商家/客户/备注" oninput="renderRecords()" style="flex:1;min-width:150px">
         <select id="fProduct" onchange="renderRecords()"><option value="">全部商品</option></select>
@@ -247,6 +271,7 @@
       <h2>📦 当前库存（按商品汇总）</h2>
       <div class="hint" style="margin-bottom:10px">库存 = 进货总数 − 已卖出总数。每批货可以分多次卖，卖多少扣多少。</div>
       <div class="toolbar">
+        <button class="btn btn-primary btn-sm" onclick="openBulkBuyModal()">📥 多商品进货</button>
         <button class="btn btn-success btn-sm" onclick="openBulkSellModal()">🧾 多商品开单</button>
         <input type="text" id="stockSearch" placeholder="搜商品名称" oninput="renderStock()" style="flex:1;min-width:130px">
         <select id="stockProduct" onchange="renderStock()"><option value="">全部商品</option></select>
@@ -547,6 +572,30 @@ function today() { const d = new Date(); return d.getFullYear() + "-" + String(d
 function money(n) { return "¥" + (Number(n) || 0).toFixed(2); }
 function qtyText(n) { return String(Math.round((Number(n) || 0) * 100) / 100); }
 function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
+/* 底部轻提示（不用 alert 弹窗，点一下保存更顺） */
+let toastTimer = null;
+function toast(msg) {
+  let el = document.getElementById("toastBox");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "toastBox";
+    el.className = "toast";
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove("show"), 2200);
+}
+
+/* 日期框：点整块（日期数字、边框任意位置）都能弹日历，不用非点右边小图标 */
+document.addEventListener("click", e => {
+  const t = e.target;
+  if (t && t.tagName === "INPUT" && t.type === "date" && typeof t.showPicker === "function") {
+    try { t.showPicker(); } catch (err) { /* 已经打开或不支持就交给浏览器默认行为 */ }
+  }
+}, true);
 
 /* ================= 计算 ================= */
 function soldQtyOf(r) { return (r.sales || []).reduce((s, x) => s + (Number(x.qty) || 0), 0); }
@@ -1571,24 +1620,43 @@ function ensureCustomer(name) {
   if (!db.customers.some(c => c.name === name)) db.customers.push({ id: nextId(), name: name, phone: "", note: "" });
 }
 
+/* 某商品最近一次的进价（按进货日期，再按录入顺序取最后一条） */
+function lastCostOf(product) {
+  if (!product) return "";
+  const list = db.records.filter(r => r.product === product && r.cost != null && r.cost !== "");
+  if (!list.length) return "";
+  list.sort((a, b) => String(a.date || "").localeCompare(String(b.date || "")) || (Number(a.id) || 0) - (Number(b.id) || 0));
+  return list[list.length - 1].cost;
+}
+
+/* 某商品最近一次的进货商家 */
+function lastSupplierOf(product) {
+  if (!product) return "";
+  const list = db.records.filter(r => r.product === product && r.supplier);
+  if (!list.length) return "";
+  list.sort((a, b) => String(a.date || "").localeCompare(String(b.date || "")) || (Number(a.id) || 0) - (Number(b.id) || 0));
+  return list[list.length - 1].supplier;
+}
+
 /* ================= 弹窗：记一笔进货 ================= */
 function openRecordModal(id) {
-  const r = db.records.find(x => x.id === id) || { date: today(), qty: 1, sales: [] };
+  const r = db.records.find(x => x.id === id) || { date: today(), qty: "", sales: [] };
   const sold = soldQtyOf(r);
   const prodOpts = productsInUse().map(p => `<option value="${esc(p)}">`).join("");
   const supOpts = suppliersInUse().map(s => `<option value="${esc(s)}">`).join("");
-  const lastCost = (r.cost !== undefined && r.cost !== null && r.cost !== "") ? r.cost
-    : ((db.records.filter(x => x.product === r.product).slice(-1)[0] || {}).cost || "");
+  const hasCost = (r.cost !== undefined && r.cost !== null && r.cost !== "");
+  let costAuto = !hasCost;   // 进价由「上次进价」自动带出；用户手填过就不再覆盖
 
   showModal(id ? "修改这批进货" : "记一笔进货", `
     <div class="form-row"><label>进货日期 *</label><input type="date" id="r-date" value="${esc(r.date || today())}"></div>
     <div class="form-row"><label>商品名称 *</label>
       <input id="r-product" list="dl-product" value="${esc(r.product || "")}" placeholder="如：机油滤芯（大众朗逸）">
       <datalist id="dl-product">${prodOpts}</datalist>
+      <div class="hint" id="r-last" style="display:none"></div>
     </div>
     <div class="form-grid">
-      <div class="form-row"><label>进货数量 *</label><input type="number" id="r-qty" min="1" step="1" value="${r.qty || 1}"></div>
-      <div class="form-row"><label>进货单价（¥/个）</label><input type="number" id="r-cost" min="0" step="0.01" value="${r.cost != null && r.cost !== "" ? r.cost : (lastCost || "")}" placeholder="0.00"></div>
+      <div class="form-row"><label>进货数量 *</label><input type="number" id="r-qty" min="0" step="1" inputmode="numeric" value="${r.qty != null && r.qty !== "" ? r.qty : ""}" placeholder="填个数"></div>
+      <div class="form-row"><label>进货单价（¥/个）</label><input type="number" id="r-cost" min="0" step="0.01" inputmode="decimal" value="${hasCost ? r.cost : ""}" placeholder="0.00"></div>
     </div>
     <div class="form-row"><label>进货商家（从哪里进的）</label>
       <input id="r-supplier" list="dl-supplier" value="${esc(r.supplier || "")}" placeholder="商家名称">
@@ -1600,7 +1668,7 @@ function openRecordModal(id) {
     const product = val("r-product"), qty = numv("r-qty");
     if (!val("r-date")) { alert("请选择进货日期"); return false; }
     if (!product) { alert("请填写商品名称"); return false; }
-    if (!(qty > 0)) { alert("请填写正确的进货数量"); return false; }
+    if (!(qty > 0)) { alert("请填写进货数量"); return false; }
     if (id && qty < sold) { alert(`这批已经卖出 ${qtyText(sold)} 个，进货数量不能小于 ${qtyText(sold)}`); return false; }
 
     const rec = {
@@ -1611,6 +1679,176 @@ function openRecordModal(id) {
     else db.records.push(Object.assign({ id: nextId(), sales: [] }, rec));
     save(); renderAll(); return true;
   });
+
+  /* 填了商品名就带出上次进价，省得每次重填 */
+  const pe = document.getElementById("r-product");
+  const ce = document.getElementById("r-cost");
+  const le = document.getElementById("r-last");
+  const syncLast = () => {
+    const p = pe ? pe.value.trim() : "";
+    const lc = lastCostOf(p);
+    if (le) {
+      if (p && lc !== "") {
+        le.style.display = "block";
+        le.textContent = `上次进价 ${money(lc)}/个，已自动填入`;
+      } else if (p) {
+        le.style.display = "block";
+        le.textContent = "这个商品以前没记过进价";
+      } else {
+        le.style.display = "none";
+      }
+    }
+    if (lc !== "" && costAuto && ce) ce.value = lc;
+  };
+  if (pe && pe.addEventListener) {
+    pe.addEventListener("input", syncLast);
+    pe.addEventListener("change", syncLast);
+  }
+  if (ce && ce.addEventListener) {
+    ce.addEventListener("input", () => { costAuto = false; });
+  }
+  syncLast();
+}
+
+/* ================= 弹窗：多商品进货（一次进好几种货） ================= */
+function buyRowHtml() {
+  return `<div class="buy-row">
+    <div><input class="bp" list="dl-bproduct" placeholder="商品名称"><span class="lpk"></span></div>
+    <input type="number" class="bq" min="0" step="1" inputmode="numeric">
+    <input type="number" class="bc" min="0" step="0.01" inputmode="decimal">
+    <button type="button" class="del" title="删掉这一行" onclick="delBuyRow(this)">✕</button>
+  </div>`;
+}
+
+function addBuyRow(focus) {
+  const listEl = document.getElementById("buyList");
+  if (!listEl) return;
+  listEl.insertAdjacentHTML("beforeend", buyRowHtml());
+  const rows = listEl.querySelectorAll(".buy-row");
+  const last = rows[rows.length - 1];
+  if (last && focus !== false) {
+    const inp = last.querySelector(".bp");
+    if (inp && inp.focus) inp.focus();
+  }
+  refreshBuyTotal();
+}
+
+function delBuyRow(btn) {
+  const row = btn && btn.closest ? btn.closest(".buy-row") : null;
+  if (!row) return;
+  row.parentNode.removeChild(row);
+  const listEl = document.getElementById("buyList");
+  if (listEl && !listEl.querySelector(".buy-row")) addBuyRow(false);
+  refreshBuyTotal();
+}
+
+function buyRowsData() {
+  return [...document.querySelectorAll("#buyList .buy-row")].map(row => ({
+    row: row,
+    product: (row.querySelector(".bp").value || "").trim(),
+    qty: parseFloat(row.querySelector(".bq").value) || 0,
+    costRaw: String(row.querySelector(".bc").value || "").trim()
+  }));
+}
+
+function refreshBuyTotal() {
+  const el = document.getElementById("buyTotal");
+  if (!el) return;
+  let n = 0, qty = 0, amt = 0;
+  buyRowsData().forEach(d => {
+    if (!d.product) return;
+    n += 1; qty += d.qty; amt += d.qty * (parseFloat(d.costRaw) || 0);
+  });
+  el.innerHTML = n
+    ? `这次进 <b>${n}</b> 种，共 <b>${qtyText(qty)}</b> 个，进货金额 <b>${money(amt)}</b>`
+    : "一行填一个商品；填了商品名会自动带出上次进价。空行不用管，保存时自动跳过。";
+}
+
+function openBulkBuyModal() {
+  const prodOpts = productsInUse().map(p => `<option value="${esc(p)}">`).join("");
+  const supOpts = suppliersInUse().map(s => `<option value="${esc(s)}">`).join("");
+
+  showModal("多商品进货 · 一次进好几种货", `
+    <div class="form-grid">
+      <div class="form-row"><label>进货日期 *</label><input type="date" id="bb-date" value="${today()}"></div>
+      <div class="form-row"><label>进货商家（都会记上）</label>
+        <input id="bb-supplier" list="dl-bsupplier" placeholder="商家名称">
+        <datalist id="dl-bsupplier">${supOpts}</datalist>
+      </div>
+    </div>
+    <div class="hint" style="margin-bottom:6px">一行一个商品：填名称、数量、进价。同一个商品再进货，进价会自动填上次的价。</div>
+    <div class="buy-list" id="buyList">
+      <div class="buy-head"><span>商品名称</span><span>数量</span><span>进价/个</span><span></span></div>
+      ${buyRowHtml() + buyRowHtml() + buyRowHtml()}
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+      <button type="button" class="btn btn-outline btn-sm" onclick="addBuyRow()">＋ 再加一行</button>
+    </div>
+    <div class="buy-total" id="buyTotal"></div>
+    <div class="form-row" style="margin-top:12px"><label>备注（这一批共用）</label><input id="bb-note" placeholder="如：运费、批次"></div>
+    <datalist id="dl-bproduct">${prodOpts}</datalist>
+  `, () => {
+    const date = val("bb-date");
+    if (!date) { alert("请选择进货日期"); return false; }
+    const supplier = val("bb-supplier"), note = val("bb-note");
+    const items = [];
+    for (const d of buyRowsData()) {
+      if (!d.product && !(d.qty > 0)) continue;                 // 整行空着 → 跳过
+      if (!d.product) { alert("有一行填了数量，但没写商品名称"); return false; }
+      if (!(d.qty > 0)) { alert(`「${d.product}」的进货数量要大于 0`); return false; }
+      items.push({ product: d.product, qty: d.qty, cost: Math.max(0, parseFloat(d.costRaw) || 0) });
+    }
+    if (!items.length) { alert("请至少填一个商品"); return false; }
+
+    items.forEach(it => db.records.push({
+      id: nextId(), date: date, product: it.product, qty: it.qty,
+      cost: it.cost, supplier: supplier, note: note, sales: []
+    }));
+    save(); renderAll();
+    const totalQty = items.reduce((a, b) => a + b.qty, 0);
+    toast(`已记 ${items.length} 笔进货，共 ${qtyText(totalQty)} 个`);
+    return true;
+  });
+
+  const listEl = document.getElementById("buyList");
+  if (listEl && listEl.addEventListener) {
+    const autoCost = (row) => {
+      const p = row.querySelector(".bp").value.trim();
+      const costEl = row.querySelector(".bc");
+      const tip = row.querySelector(".lpk");
+      const lc = lastCostOf(p);
+      if (!p) { if (tip) { tip.className = "lpk"; tip.textContent = ""; } return; }
+      if (lc !== "") {
+        if (tip) { tip.className = "lpk hit"; tip.textContent = `上次进价 ${money(lc)}`; }
+        if (String(costEl.value).trim() === "") costEl.value = lc;
+      } else {
+        if (tip) { tip.className = "lpk"; tip.textContent = "以前没记过这个商品"; }
+      }
+    };
+    listEl.addEventListener("input", e => {
+      const row = e.target.closest ? e.target.closest(".buy-row") : null;
+      if (!row) return;
+      if (e.target.classList.contains("bp")) autoCost(row);
+      if (e.target.classList.contains("bq") || e.target.classList.contains("bc")) refreshBuyTotal();
+    });
+    listEl.addEventListener("change", e => {
+      const row = e.target.closest ? e.target.closest(".buy-row") : null;
+      if (row && e.target.classList.contains("bp")) autoCost(row);
+    });
+  }
+  refreshBuyTotal();
+}
+
+/* 把光标放到最后一个空行的商品框 */
+function focusBuyProduct() {
+  const rows = [...document.querySelectorAll("#buyList .buy-row")];
+  let target = rows.find(r => !(r.querySelector(".bp").value || "").trim());
+  if (!target) {
+    addBuyRow(false);
+    const all = [...document.querySelectorAll("#buyList .buy-row")];
+    target = all[all.length - 1];
+  }
+  if (target) { const inp = target.querySelector(".bp"); if (inp) inp.focus(); }
 }
 
 /* ================= 弹窗：卖出一笔 ================= */
