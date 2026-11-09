@@ -128,6 +128,17 @@
   .toast.show { opacity: 1; transform: translate(-50%, 0); }
   /* 日期框整块可点 */
   input[type=date] { cursor: pointer; }
+  /* ===== 每月利润 · 每日明细 ===== */
+  .mth-toggle { cursor: pointer; color: #1e3a5f; font-weight: 700; white-space: nowrap; user-select: none; }
+  .mth-toggle:hover { color: #2563eb; }
+  .mth-toggle .arw { display: inline-block; width: 12px; color: #94a3b8; }
+  .day-wrap td { background: #f8fafc; padding: 6px 10px 12px; }
+  .day-box { background: #fff; border: 1px solid #e8edf4; border-radius: 9px; padding: 8px 10px 4px; }
+  .day-head { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; font-size: 12px; font-weight: 700; color: #1e3a5f; margin-bottom: 6px; }
+  .day-head .sm { font-weight: 500; color: #64748b; }
+  .day-table { min-width: 0; }
+  .day-table th, .day-table td { padding: 5px 7px; font-size: 12px; }
+  .day-table tfoot td { background: #f1f5f9; font-weight: 700; }
   .order-tag { display: inline-block; background: #e0e7ff; color: #3730a3; border-radius: 6px; padding: 0 5px; font-size: 10px; font-weight: 700; margin-left: 4px; }
   /* ===== 客户销货记录 ===== */
   .cs-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
@@ -227,7 +238,7 @@
 <div class="header">
   <div>
     <h1>🚚 嘉诺汽配 · 进销货记录</h1>
-    <div class="sub">卖多少记多少，库存自动算｜数据存本机，建议定期导出备份<span id="verTag" style="opacity:.55"> · v20</span></div>
+    <div class="sub">卖多少记多少，库存自动算｜数据存本机，建议定期导出备份<span id="verTag" style="opacity:.55"> · v21</span></div>
   </div>
   <div class="header-actions">
     <button class="btn btn-outline" id="fsBtn" onclick="toggleFullscreen()" style="display:none">⛶ 全屏</button>
@@ -251,7 +262,7 @@
     <div class="card">
       <div class="toolbar">
         <button class="btn btn-primary" onclick="openBulkBuyModal()">＋ 记进货</button>
-        <button class="btn btn-success" onclick="openBulkSellModal()">🧾 多商品开单</button>
+        <button class="btn btn-success" onclick="openBulkSellModal()">＋ 记卖货</button>
         <input type="text" id="fKeyword" placeholder="搜商品/商家/客户/备注" oninput="renderRecords()" style="flex:1;min-width:150px">
         <select id="fProduct" onchange="renderRecords()"><option value="">全部商品</option></select>
         <select id="fCustomer" onchange="renderRecords()"><option value="">全部客户</option></select>
@@ -271,7 +282,7 @@
       <div class="hint" style="margin-bottom:10px">库存 = 进货总数 − 已卖出总数。每批货可以分多次卖，卖多少扣多少。</div>
       <div class="toolbar">
         <button class="btn btn-primary btn-sm" onclick="openBulkBuyModal()">＋ 记进货</button>
-        <button class="btn btn-success btn-sm" onclick="openBulkSellModal()">🧾 多商品开单</button>
+        <button class="btn btn-success btn-sm" onclick="openBulkSellModal()">＋ 记卖货</button>
         <input type="text" id="stockSearch" placeholder="搜商品名称" oninput="renderStock()" style="flex:1;min-width:130px">
         <select id="stockProduct" onchange="renderStock()"><option value="">全部商品</option></select>
         <select id="stockState" onchange="renderStock()" title="按有没有货筛选">
@@ -289,6 +300,11 @@
       </div>
       <div id="stockSum"></div>
       <div class="table-wrap"><table id="stockTable"></table></div>
+    </div>
+    <div class="card">
+      <h2>⚠️ 库存提醒</h2>
+      <div class="hint" style="margin-bottom:10px">在库不到 2 个、已经卖完的商品都列在这里，好及时补货。</div>
+      <div class="table-wrap"><table id="alertTable"></table></div>
     </div>
   </section>
 
@@ -316,7 +332,7 @@
         <label class="chk-label"><input type="checkbox" id="sfDebtOnly" onchange="renderSales()"> 只看有欠款</label>
         <button class="btn btn-outline btn-sm" onclick="clearSalesFilters()">重置</button>
         <button class="btn btn-outline btn-sm" onclick="exportSalesCsv()">⬇ 导出表格</button>
-        <button class="btn btn-success btn-sm" onclick="openBulkSellModal()">🧾 多商品开单</button>
+        <button class="btn btn-success btn-sm" onclick="openBulkSellModal()">＋ 记卖货</button>
       </div>
       <div id="salesSum"></div>
       <div class="table-wrap"><table id="salesTable" class="rs-table"></table></div>
@@ -378,17 +394,13 @@
           <option value="6">最近 6 个月</option>
           <option value="0">全部月份</option>
         </select>
-        <span class="hint" style="margin:0">条形长度 = 当月毛利占比</span>
+        <span class="hint" style="margin:0">条形长度 = 当月毛利占比｜点月份可展开每天的利润</span>
       </div>
       <div class="table-wrap"><table id="monthTable"></table></div>
     </div>
     <div class="card">
       <h2>💰 各商品经营情况</h2>
       <div class="table-wrap"><table id="productTable"></table></div>
-    </div>
-    <div class="card">
-      <h2>⚠️ 库存提醒</h2>
-      <div class="table-wrap"><table id="alertTable"></table></div>
     </div>
   </section>
 </div>
@@ -616,12 +628,17 @@ function stockBatchesOf(product) {
     .filter(r => r.product === product && stockOf(r) > 1e-9)
     .sort((a, b) => String(a.date).localeCompare(String(b.date)) || a.id - b.id);
 }
-// 该商品最近一次的卖价，开单时当默认价
+// 该商品最近一次的卖价，开单时当默认价（0 元的记错/赠送不拿来当默认）
 function lastPriceOf(product) {
   let best = null;
   db.records.forEach(r => {
     if (r.product !== product) return;
-    (r.sales || []).forEach(s => { if (!best || String(s.date) >= String(best.date)) best = s; });
+    (r.sales || []).forEach(s => {
+      if ((Number(s.price) || 0) <= 0) return;
+      if (!best) { best = s; return; }
+      const d = String(s.date || ""), bd = String(best.date || "");
+      if (d > bd || (d === bd && (Number(s.id) || 0) > (Number(best.id) || 0))) best = s;
+    });
   });
   return best ? (Number(best.price) || 0) : 0;
 }
@@ -693,6 +710,36 @@ function monthlyStats() {
     if (mi) { const oi = ensure(mi); oi.inQty += Number(r.qty) || 0; oi.inAmt += (Number(r.qty) || 0) * c; }
   });
   return Object.values(map).filter(o => o.count || o.inQty).sort((a, b) => b.month.localeCompare(a.month));
+}
+
+/* 某个月里每一天的利润（按卖出日期归属） */
+function dailyStats(month) {
+  const map = {};
+  db.records.forEach(r => {
+    const c = Number(r.cost) || 0;
+    (r.sales || []).forEach(s => {
+      const d = String(s.date || r.date || "");
+      if (!d || d.slice(0, 7) !== month) return;
+      const o = map[d] || (map[d] = { date: d, count: 0, qty: 0, amt: 0, cost: 0, profit: 0, paid: 0, debt: 0 });
+      const q = Number(s.qty) || 0, p = Number(s.price) || 0;
+      o.count += 1; o.qty += q; o.amt += q * p; o.cost += q * c;
+      o.profit += q * (p - c); o.paid += salePaid(s); o.debt += saleDebt(s);
+    });
+  });
+  return Object.values(map).sort((a, b) => b.date.localeCompare(a.date));
+}
+
+/* 哪些月份展开了「每日利润」 */
+let openMonths = new Set();
+function toggleMonthDays(el) {
+  const m = el.dataset.month;
+  const row = document.getElementById("days-" + m);
+  if (!row) return;
+  const willOpen = row.style.display === "none";
+  row.style.display = willOpen ? "" : "none";
+  if (willOpen) openMonths.add(m); else openMonths.delete(m);
+  const arw = el.querySelector(".arw");
+  if (arw) arw.textContent = willOpen ? "▾" : "▸";
 }
 
 function allRecords() { return db.records.slice().sort((a, b) => String(b.date).localeCompare(String(a.date)) || b.id - a.id); }
@@ -1171,6 +1218,7 @@ function fillStockSelect() {
 function renderStock() {
   const sel = document.getElementById("stockProduct");
   fillStockSelect();
+  renderStockAlerts();
   const kw = (document.getElementById("stockSearch").value || "").toLowerCase().trim();
   const stateEl = document.getElementById("stockState");
   const sortEl = document.getElementById("stockSort");
@@ -1536,15 +1584,24 @@ function renderDash() {
       <td><button class="btn btn-outline btn-sm" data-product="${esc(s.product)}" onclick="showProductRecords(this.dataset.product)">看记录</button></td>
     </tr>`).join("")}</tbody>` : `<tbody><tr><td colspan="8"><div class="empty-tip">暂无数据</div></td></tr></tbody>`;
 
-  const alerts = stats.filter(s => s.inQty > 0 && s.stockQty < 2);
-  document.getElementById("alertTable").innerHTML = alerts.length ? `
-    <thead><tr><th>商品</th><th class="num">在库</th><th>状态</th><th></th></tr></thead>
+}
+
+/* ================= 渲染：库存提醒（放在「库存」页） ================= */
+function renderStockAlerts() {
+  const el = document.getElementById("alertTable");
+  if (!el) return;
+  const alerts = productStats()
+    .filter(s => s.inQty > 0 && s.stockQty < 2)
+    .sort((a, b) => a.stockQty - b.stockQty || a.product.localeCompare(b.product, "zh"));
+  el.innerHTML = alerts.length ? `
+    <thead><tr><th>商品</th><th class="num">在库</th><th>状态</th><th class="num">最近卖价</th><th></th></tr></thead>
     <tbody>${alerts.map(s => `<tr>
       <td><b>${esc(s.product)}</b></td>
       <td class="num">${qtyText(s.stockQty)}</td>
       <td>${s.stockQty <= 0 ? '<span class="tag tag-out">已卖完</span>' : '<span class="tag tag-low">库存偏低</span>'}</td>
+      <td class="num">${lastPriceOf(s.product) > 0 ? money(lastPriceOf(s.product)) : '<span class="muted">-</span>'}</td>
       <td><button class="btn btn-outline btn-sm" data-product="${esc(s.product)}" onclick="showProductRecords(this.dataset.product)">看记录</button></td>
-    </tr>`).join("")}</tbody>` : `<tbody><tr><td colspan="4"><div class="empty-tip">👍 暂无提醒</div></td></tr></tbody>`;
+    </tr>`).join("")}</tbody>` : `<tbody><tr><td colspan="5"><div class="empty-tip">👍 暂无提醒，库存都还够</div></td></tr></tbody>`;
 }
 
 /* ================= 渲染：每月利润 ================= */
@@ -1571,8 +1628,24 @@ function renderMonthly() {
     <tbody>${rows.map(o => {
       const rate = o.amt > 0 ? (o.profit / o.amt * 100) : null;
       const pct = Math.min(100, Math.round(Math.abs(o.profit) / maxAbs * 100));
+      const days = dailyStats(o.month);
+      const open = openMonths.has(o.month);
+      const avg = days.length ? o.profit / days.length : 0;
+      const dayRows = days.map(d => {
+        const wd = "日一二三四五六"[new Date(d.date + "T00:00:00").getDay()];
+        return `<tr>
+          <td>${esc(d.date.slice(5))} <span class="muted">周${wd}</span></td>
+          <td class="num">${d.count}</td>
+          <td class="num">${qtyText(d.qty)}</td>
+          <td class="num">${money(d.amt)}</td>
+          <td class="num">${money(d.cost)}</td>
+          <td class="num" style="color:${d.profit >= 0 ? "#16a34a" : "#dc2626"};font-weight:600">${money(d.profit)}</td>
+          <td class="num"><span class="paid-num">${money(d.paid)}</span></td>
+          <td class="num">${d.debt > 0.005 ? `<span class="debt-num">${money(d.debt)}</span>` : '<span class="muted">0</span>'}</td>
+        </tr>`;
+      }).join("");
       return `<tr>
-        <td><b>${esc(o.month)}</b></td>
+        <td><span class="mth-toggle" data-month="${esc(o.month)}" onclick="toggleMonthDays(this)"><span class="arw">${open ? "▾" : "▸"}</span>${esc(o.month)}</span></td>
         <td class="num">${o.count}</td>
         <td class="num">${qtyText(o.qty)}</td>
         <td class="num">${money(o.amt)}</td>
@@ -1583,6 +1656,30 @@ function renderMonthly() {
         <td class="num">${o.debt > 0.005 ? `<span class="debt-num">${money(o.debt)}</span>` : '<span class="muted">0</span>'}</td>
         <td class="num muted">${money(o.inAmt)}</td>
         <td><div class="bar-wrap"><div class="bar" style="width:${Math.max(2, pct)}%;${o.profit < 0 ? "background:#dc2626" : ""}"></div></div></td>
+      </tr>
+      <tr class="day-wrap" id="days-${esc(o.month)}" style="${open ? "" : "display:none"}">
+        <td colspan="11">
+          <div class="day-box">
+            <div class="day-head">
+              <span>${esc(o.month)} 每日利润</span>
+              <span class="sm">有卖出 ${days.length} 天 · 平均每天毛利 ${money(avg)}</span>
+            </div>
+            ${days.length ? `<table class="day-table">
+              <thead><tr><th>日期</th><th class="num">笔数</th><th class="num">卖出个数</th><th class="num">销售额</th><th class="num">成本</th><th class="num">毛利</th><th class="num">已收</th><th class="num">欠款</th></tr></thead>
+              <tbody>${dayRows}</tbody>
+              <tfoot><tr>
+                <td>本月合计</td>
+                <td class="num">${o.count}</td>
+                <td class="num">${qtyText(o.qty)}</td>
+                <td class="num">${money(o.amt)}</td>
+                <td class="num">${money(o.cost)}</td>
+                <td class="num" style="color:${o.profit >= 0 ? "#16a34a" : "#dc2626"}">${money(o.profit)}</td>
+                <td class="num">${money(o.paid)}</td>
+                <td class="num">${o.debt > 0.005 ? money(o.debt) : "0"}</td>
+              </tr></tfoot>
+            </table>` : '<div class="empty-tip" style="padding:12px 0">这个月还没有卖出记录（只有进货）</div>'}
+          </div>
+        </td>
       </tr>`;
     }).join("")}</tbody>
     <tfoot><tr style="background:#f8fafc;font-weight:700">
@@ -1858,6 +1955,7 @@ function openSellModal(id) {
   sellCtx = { cost: Number(r.cost) || 0, paidTouched: false };
   const stock = stockOf(r), sold = soldQtyOf(r);
   const last = (r.sales || []).slice().sort((a, b) => String(a.date).localeCompare(String(b.date))).slice(-1)[0];
+  const lp = lastPriceOf(r.product);   // 同一商品上次卖价（跨批次）
   const custOpts = customersInUse().map(c => `<option value="${esc(c)}">`).join("");
   const sales = (r.sales || []).slice().sort((a, b) => String(b.date).localeCompare(String(a.date)));
 
@@ -1891,8 +1989,9 @@ function openSellModal(id) {
     <div style="margin-top:14px"></div>
     <div class="form-grid">
       <div class="form-row"><label>这次卖出数量 *</label><input type="number" id="s-qty" min="1" step="1" value="${stock > 0 ? stock : 1}"></div>
-      <div class="form-row"><label>卖出单价（¥/个）*</label><input type="number" id="s-price" min="0" step="0.01" value="${last ? last.price : ""}" placeholder="0.00"></div>
+      <div class="form-row"><label>卖出单价（¥/个）*</label><input type="number" id="s-price" min="0" step="0.01" value="${lp || (last ? last.price : "")}" placeholder="0.00"></div>
     </div>
+    ${lp > 0 ? `<div class="hint" style="margin:-6px 0 10px">上次这个商品卖 ${money(lp)}/个，已自动填好，要改直接改数字。</div>` : ""}
     <div class="form-row"><label>卖给谁（客户）*</label>
       <input id="s-customer" list="dl-cust" value="${last ? esc(last.customer || "") : ""}" placeholder="客户名称">
       <datalist id="dl-cust">${custOpts}</datalist>
@@ -2094,7 +2193,7 @@ function openBulkSellModal(preCustomer) {
     </div>`;
   }).join("");
 
-  showModal("多商品开单 · 一次卖给一个客户", `
+  showModal("记卖货 · 一次卖给一个客户", `
     <div class="hint" style="margin-bottom:8px">勾上这次要卖的商品，填数量和卖价。同一张单只占一个单号、只打一张送货单；库存按「先进先出」自动扣。</div>
     <div class="pick-tools">
       <input id="pickSearch" placeholder="搜商品名称" oninput="filterPickRows(this.value)">
