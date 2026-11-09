@@ -204,7 +204,7 @@
 <div class="header">
   <div>
     <h1>🚚 嘉诺汽配 · 进销货记录</h1>
-    <div class="sub">一条记一批进货：进价、数量、商家；卖多少记多少，库存自动算｜数据存本机，建议定期导出备份<span id="verTag" style="opacity:.55"> · v17</span></div>
+    <div class="sub">一条记一批进货：进价、数量、商家；卖多少记多少，库存自动算｜数据存本机，建议定期导出备份<span id="verTag" style="opacity:.55"> · v18</span></div>
   </div>
   <div class="header-actions">
     <button class="btn btn-outline" id="fsBtn" onclick="toggleFullscreen()" style="display:none">⛶ 全屏</button>
@@ -229,11 +229,11 @@
       <div class="toolbar">
         <button class="btn btn-primary" onclick="openRecordModal()">＋ 记一笔进货</button>
         <button class="btn btn-success" onclick="openBulkSellModal()">🧾 多商品开单</button>
+        <input type="text" id="fKeyword" placeholder="搜商品/商家/客户/备注" oninput="renderRecords()" style="flex:1;min-width:150px">
         <select id="fProduct" onchange="renderRecords()"><option value="">全部商品</option></select>
         <select id="fCustomer" onchange="renderRecords()"><option value="">全部客户</option></select>
         <input type="date" id="fFrom" onchange="renderRecords()" title="进货日期起">
         <input type="date" id="fTo" onchange="renderRecords()" title="进货日期止">
-        <input type="text" id="fKeyword" placeholder="搜商品/商家/客户/备注" oninput="renderRecords()" style="flex:1;min-width:130px">
         <button class="btn btn-outline btn-sm" onclick="clearFilters()">重置</button>
       </div>
       <div id="sumBar"></div>
