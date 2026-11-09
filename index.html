@@ -128,6 +128,12 @@
   .toast.show { opacity: 1; transform: translate(-50%, 0); }
   /* 日期框整块可点 */
   input[type=date] { cursor: pointer; }
+  /* ===== 分页 ===== */
+  .pager { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: center; padding: 10px 2px 2px; font-size: 12px; color: #475569; }
+  .pager .pg-info b { color: #1e3a5f; }
+  .pager button[disabled] { opacity: .38; cursor: default; }
+  .pager .pg-jump { display: flex; align-items: center; gap: 5px; }
+  .pager .pg-jump input { width: 52px; padding: 5px 6px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 12px; font-family: inherit; text-align: center; }
   /* ===== 每月利润 · 每日明细 ===== */
   .mth-toggle { cursor: pointer; color: #1e3a5f; font-weight: 700; white-space: nowrap; user-select: none; }
   .mth-toggle:hover { color: #2563eb; }
@@ -238,7 +244,7 @@
 <div class="header">
   <div>
     <h1>🚚 嘉诺汽配 · 进销货记录</h1>
-    <div class="sub">卖多少记多少，库存自动算｜数据存本机，建议定期导出备份<span id="verTag" style="opacity:.55"> · v21</span></div>
+    <div class="sub">卖多少记多少，库存自动算｜数据存本机，建议定期导出备份<span id="verTag" style="opacity:.55"> · v22</span></div>
   </div>
   <div class="header-actions">
     <button class="btn btn-outline" id="fsBtn" onclick="toggleFullscreen()" style="display:none">⛶ 全屏</button>
@@ -272,6 +278,7 @@
       </div>
       <div id="sumBar"></div>
       <div class="table-wrap"><table id="recordsTable"></table></div>
+      <div id="pager-rec"></div>
     </div>
   </section>
 
@@ -300,6 +307,7 @@
       </div>
       <div id="stockSum"></div>
       <div class="table-wrap"><table id="stockTable"></table></div>
+      <div id="pager-stock"></div>
     </div>
     <div class="card">
       <h2>⚠️ 库存提醒</h2>
@@ -336,6 +344,7 @@
       </div>
       <div id="salesSum"></div>
       <div class="table-wrap"><table id="salesTable" class="rs-table"></table></div>
+      <div id="pager-sales"></div>
       <div class="hint" id="salesHint"></div>
     </div>
   </section>
@@ -352,6 +361,7 @@
       </div>
       <div id="custSum"></div>
       <div class="table-wrap"><table id="customersTable"></table></div>
+      <div id="pager-cust"></div>
     </div>
 
     <!-- 客户销货记录：点客户行的「销货记录」展开，数据与卖出记录实时同步 -->
@@ -401,6 +411,7 @@
     <div class="card">
       <h2>💰 各商品经营情况</h2>
       <div class="table-wrap"><table id="productTable"></table></div>
+      <div id="pager-prod"></div>
     </div>
   </section>
 </div>
@@ -787,6 +798,49 @@ function customerStats() {
   return Object.values(map);
 }
 
+/* ================= 分页（每个列表每页 15 条，看更早的点翻页） ================= */
+const PAGE_SIZE = 15;
+const pagerPage = { rec: 1, stock: 1, sales: 1, cust: 1, prod: 1 };
+const pagerSig = { rec: "", stock: "", sales: "", cust: "", prod: "" };
+const PAGER_TARGET = { rec: "recordsTable", stock: "stockTable", sales: "salesTable", cust: "customersTable", prod: "productTable" };
+
+/* 取第 page 页的 15 条；筛选条件变了就自动回到第 1 页 */
+function paginate(list, key, sig) {
+  if (sig !== undefined && sig !== pagerSig[key]) { pagerSig[key] = sig; pagerPage[key] = 1; }
+  const total = list.length;
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  let page = Math.min(Math.max(1, pagerPage[key] || 1), pages);
+  pagerPage[key] = page;
+  const from = (page - 1) * PAGE_SIZE;
+  return { rows: list.slice(from, from + PAGE_SIZE), total: total, pages: pages, page: page, from: from };
+}
+
+function pagerHtml(key, pg) {
+  if (!pg) return "";
+  const { page, pages, total } = pg;
+  if (total <= PAGE_SIZE) return `<div class="pager"><span class="pg-info">共 ${total} 条</span></div>`;
+  const btn = (p, label, dis, extra) => `<button class="btn btn-outline btn-sm" ${dis ? "disabled" : ""} ${extra || ""} onclick="gotoPage('${key}',${p})">${label}</button>`;
+  return `<div class="pager">
+    ${btn(1, "« 首页", page <= 1)}
+    ${btn(page - 1, "‹ 上一页", page <= 1)}
+    <span class="pg-info">第 <b>${page}</b> / ${pages} 页 · 共 ${total} 条（第 ${pg.from + 1}–${pg.from + pg.rows.length} 条）</span>
+    ${btn(page + 1, "下一页 ›", page >= pages)}
+    ${btn(pages, "末页 »", page >= pages)}
+  </div>`;
+}
+
+function gotoPage(key, p) {
+  pagerPage[key] = p;
+  if (key === "rec") renderRecords();
+  else if (key === "stock") renderStock();
+  else if (key === "sales") renderSales();
+  else if (key === "cust") renderCustomers();
+  else if (key === "prod") renderDash();
+  const id = PAGER_TARGET[key];
+  const el = id ? document.getElementById(id) : null;
+  if (el && el.scrollIntoView) { try { el.scrollIntoView({ block: "start", behavior: "smooth" }); } catch (e) {} }
+}
+
 /* ================= 销货记录：全部卖出流水 + 按客户/商品/月份汇总 ================= */
 let salesView = "flow";
 const SALES_LIMIT = 200;
@@ -924,12 +978,15 @@ function renderSales() {
       <span class="profit">毛利 ${money(s.profit)}（${rateText(s.profit, s.total)}）</span>
     </div>`;
   }
-  const shown = list.slice(0, SALES_LIMIT);
+  /* 每页 15 条；切视图或筛选变了自动回第 1 页 */
+  const sigBase = salesView + "|" + list.length + "|" + (list[0] ? list[0].rid + "-" + list[0].sid : "");
+  let pg = null;
 
   if (salesView === "flow") {
     const head = [{ t: "日期" }, { t: "客户" }, { t: "商品" }, { t: "数量", cls: "num" }, { t: "单价", cls: "num" },
       { t: "金额", cls: "num" }, { t: "已收", cls: "num" }, { t: "欠款", cls: "num" }, { t: "操作" }];
-    const rows = shown.map(x => ({
+    pg = paginate(list, "sales", sigBase);
+    const rows = pg.rows.map(x => ({
       cells: [
         { l: "日期", v: esc(x.date || "—"), cls: "first" },
         { l: "客户", v: esc(x.customer) },
@@ -954,9 +1011,10 @@ function renderSales() {
       if (x.date > o.last) o.last = x.date;
     });
     const groups = Object.values(map).sort((a, b) => b.total - a.total);
+    pg = paginate(groups, "sales", sigBase + "|c" + groups.length);
     const head = [{ t: "客户" }, { t: "笔数", cls: "num" }, { t: "个数", cls: "num" }, { t: "销售额", cls: "num" },
       { t: "已收", cls: "num" }, { t: "欠款", cls: "num" }, { t: "最近一次", cls: "num" }, { t: "操作" }];
-    const rows = groups.map(g => ({
+    const rows = pg.rows.map(g => ({
       cells: [
         { l: "客户", v: esc(g.name), cls: "first" },
         { l: "笔数", v: g.n, cls: "num" },
@@ -978,9 +1036,10 @@ function renderSales() {
       o.custs.add(x.customer);
     });
     const groups = Object.values(map).sort((a, b) => b.profit - a.profit);
+    pg = paginate(groups, "sales", sigBase + "|p" + groups.length);
     const head = [{ t: "商品" }, { t: "卖出个数", cls: "num" }, { t: "均价", cls: "num" }, { t: "销售额", cls: "num" },
       { t: "成本", cls: "num" }, { t: "毛利", cls: "num" }, { t: "毛利率", cls: "num" }, { t: "剩余库存", cls: "num" }, { t: "操作" }];
-    const rows = groups.map(g => ({
+    const rows = pg.rows.map(g => ({
       cells: [
         { l: "商品", v: esc(g.name), cls: "first" },
         { l: "卖出个数", v: qtyText(g.qty), cls: "num" },
@@ -1002,9 +1061,10 @@ function renderSales() {
       o.n += 1; o.qty += x.qty; o.total += x.total; o.cost += x.costAmt; o.profit += x.profit;
     });
     const groups = Object.values(map).sort((a, b) => String(b.m).localeCompare(String(a.m)));
+    pg = paginate(groups, "sales", sigBase + "|m" + groups.length);
     const head = [{ t: "月份" }, { t: "笔数", cls: "num" }, { t: "个数", cls: "num" }, { t: "销售额", cls: "num" },
       { t: "成本", cls: "num" }, { t: "毛利", cls: "num" }, { t: "毛利率", cls: "num" }];
-    const rows = groups.map(g => ({
+    const rows = pg.rows.map(g => ({
       cells: [
         { l: "月份", v: esc(g.m), cls: "first" },
         { l: "笔数", v: g.n, cls: "num" },
@@ -1031,11 +1091,12 @@ function renderSales() {
 
   const hint = document.getElementById("salesHint");
   if (hint) {
-    const more = list.length > shown.length ? ` 已按时间倒序只显示前 ${SALES_LIMIT} 笔，请缩小日期范围或加筛选。` : "";
     hint.innerHTML = salesView === "flow"
-      ? `共 ${list.length} 笔卖出。这里和「进销货记录 / 库存 / 客户欠款」用的是同一份数据，改一笔、删一笔，各处立刻跟着变。${more}`
-      : `共 ${list.length} 笔卖出，按${salesView === "cust" ? "客户" : salesView === "prod" ? "商品" : "月份"}汇总，点「看流水」看明细。${more}`;
+      ? `共 ${list.length} 笔卖出。这里和「进销货记录 / 库存 / 客户欠款」用的是同一份数据，改一笔、删一笔，各处立刻跟着变。`
+      : `共 ${list.length} 笔卖出，按${salesView === "cust" ? "客户" : salesView === "prod" ? "商品" : "月份"}汇总，点「看流水」看明细。`;
   }
+  const pEl = document.getElementById("pager-sales");
+  if (pEl) pEl.innerHTML = pagerHtml("sales", pg);
 }
 
 function salesCsvRows() {
@@ -1151,6 +1212,7 @@ function renderRecords() {
   initFilters();
   const list = filteredRecords();
   const f = currentFilters();
+  const pg = paginate(list, "rec", JSON.stringify(f) + "|" + list.length);
 
   const inQty = list.reduce((s, r) => s + (Number(r.qty) || 0), 0);
   const inAmt = list.reduce((s, r) => s + (Number(r.qty) || 0) * (Number(r.cost) || 0), 0);
@@ -1177,7 +1239,7 @@ function renderRecords() {
       <th>卖出明细（客户 / 售价）</th><th class="num">毛利</th><th>操作</th>
     </tr></thead>
     <tbody>
-    ${list.map(r => {
+    ${pg.rows.map(r => {
       const sq = soldQtyOf(r), st = stockOf(r), pf = profitOf(r);
       return `<tr>
         <td>${esc(r.date)}</td>
@@ -1196,6 +1258,8 @@ function renderRecords() {
       </tr>`;
     }).join("")}
     </tbody>` : `<tbody><tr><td colspan="10"><div class="empty-tip">还没有记录，点「＋ 记进货」开始</div></td></tr></tbody>`;
+  const pEl = document.getElementById("pager-rec");
+  if (pEl) pEl.innerHTML = pagerHtml("rec", pg);
 }
 
 function clearFilters() {
@@ -1239,6 +1303,8 @@ function renderStock() {
   else if (sortBy === "value") stats.sort((a, b) => b.stockValue - a.stockValue || byName(a, b));
   else stats.sort((a, b) => a.stockQty - b.stockQty || byName(a, b));
 
+  const pg = paginate(stats, "stock", [sel.value, kw, state, sortBy].join("|") + "|" + stats.length);
+
   const tQty = stats.reduce((s, x) => s + x.stockQty, 0);
   const tVal = stats.reduce((s, x) => s + x.stockValue, 0);
   const tSold = stats.reduce((s, x) => s + x.soldQty, 0);
@@ -1257,12 +1323,14 @@ function renderStock() {
         : state === "out" ? "目前没有卖完的商品，所有商品都还有库存"
           : "暂无库存数据";
     document.getElementById("stockTable").innerHTML = `<tbody><tr><td colspan="7"><div class="empty-tip">${msg}</div></td></tr></tbody>`;
+    const pe = document.getElementById("pager-stock");
+    if (pe) pe.innerHTML = "";
     return;
   }
 
   document.getElementById("stockTable").innerHTML = `
     <thead><tr><th>商品</th><th class="num">在库个数</th><th class="num">进货均价</th><th class="num">库存成本</th><th class="num">累计进货</th><th class="num">已卖出</th><th>操作</th></tr></thead>
-    <tbody>${stats.map(s => `<tr>
+    <tbody>${pg.rows.map(s => `<tr>
       <td><b>${esc(s.product)}</b><div class="hint">${s.batches} 批${s.stockQty <= 0 ? " · 已卖完" : ""}</div></td>
       <td class="num"><b style="color:${s.stockQty > 0 ? "#1e3a5f" : "#9ca3af"}">${qtyText(s.stockQty)}</b></td>
       <td class="num">${money(s.inQty ? s.inValue / s.inQty : 0)}</td>
@@ -1273,6 +1341,8 @@ function renderStock() {
         <button class="btn btn-outline btn-sm" data-product="${esc(s.product)}" onclick="showProductRecords(this.dataset.product)">看记录</button>
       </div></td>
     </tr>`).join("")}</tbody>`;
+  const pEl = document.getElementById("pager-stock");
+  if (pEl) pEl.innerHTML = pagerHtml("stock", pg);
 }
 
 function clearStockFilters() {
@@ -1509,6 +1579,7 @@ function renderCustomers() {
   if (kw) rows = rows.filter(o => (o.name + ((info[o.name] && info[o.name].phone) || "")).toLowerCase().includes(kw));
   if (onlyDebt) rows = rows.filter(o => o.debt > 0.005);
   rows.sort((a, b) => b.debt - a.debt || b.amt - a.amt);
+  const pg = paginate(rows, "cust", kw + "|" + onlyDebt + "|" + rows.length);
 
   const tAmt = rows.reduce((s, o) => s + o.amt, 0);
   const tDebt = rows.reduce((s, o) => s + o.debt, 0);
@@ -1523,7 +1594,7 @@ function renderCustomers() {
 
   document.getElementById("customersTable").innerHTML = rows.length ? `
     <thead><tr><th>客户名称</th><th>电话</th><th class="num">购买笔数</th><th class="num">累计个数</th><th class="num">累计金额</th><th class="num">未收欠款</th><th>最近购买</th><th>备注</th><th>操作</th></tr></thead>
-    <tbody>${rows.map(o => {
+    <tbody>${pg.rows.map(o => {
       const c = info[o.name] || {};
       const on = csCtx.name === o.name;
       return `<tr class="${on ? "sel-row" : ""}">
@@ -1544,6 +1615,8 @@ function renderCustomers() {
         </div></td>
       </tr>`;
     }).join("")}</tbody>` : `<tbody><tr><td colspan="9"><div class="empty-tip">${onlyDebt ? "当前没有客户欠款，很干净 👍" : "还没有客户，卖货时填了客户名就会自动出现在这里"}</div></td></tr></tbody>`;
+  const pEl = document.getElementById("pager-cust");
+  if (pEl) pEl.innerHTML = pagerHtml("cust", pg);
 }
 
 /* ================= 渲染：汇总 ================= */
@@ -1571,9 +1644,10 @@ function renderDash() {
   ].map(([l, v, c]) => `<div class="stat"><div class="label">${l}</div><div class="value ${c}">${v}</div></div>`).join("");
 
   const stats = productStats().sort((a, b) => b.profit - a.profit);
+  const pg = paginate(stats, "prod", String(stats.length));
   document.getElementById("productTable").innerHTML = stats.length ? `
     <thead><tr><th>商品</th><th class="num">进货个数</th><th class="num">进货均价</th><th class="num">卖出个数</th><th class="num">销售均价</th><th class="num">在库</th><th class="num">毛利</th><th></th></tr></thead>
-    <tbody>${stats.map(s => `<tr>
+    <tbody>${pg.rows.map(s => `<tr>
       <td><b>${esc(s.product)}</b></td>
       <td class="num">${qtyText(s.inQty)}</td>
       <td class="num">${money(s.inQty ? s.inValue / s.inQty : 0)}</td>
@@ -1583,7 +1657,8 @@ function renderDash() {
       <td class="num" style="color:${s.profit >= 0 ? "#16a34a" : "#dc2626"};font-weight:600">${money(s.profit)}</td>
       <td><button class="btn btn-outline btn-sm" data-product="${esc(s.product)}" onclick="showProductRecords(this.dataset.product)">看记录</button></td>
     </tr>`).join("")}</tbody>` : `<tbody><tr><td colspan="8"><div class="empty-tip">暂无数据</div></td></tr></tbody>`;
-
+  const pEl = document.getElementById("pager-prod");
+  if (pEl) pEl.innerHTML = pagerHtml("prod", pg);
 }
 
 /* ================= 渲染：库存提醒（放在「库存」页） ================= */
