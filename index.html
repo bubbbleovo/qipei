@@ -244,7 +244,7 @@
 <div class="header">
   <div>
     <h1>🚚 嘉诺汽配 · 进销货记录</h1>
-    <div class="sub">卖多少记多少，库存自动算｜数据存本机，建议定期导出备份<span id="verTag" style="opacity:.55"> · v23</span></div>
+    <div class="sub">卖多少记多少，库存自动算｜数据存本机，建议定期导出备份<span id="verTag" style="opacity:.55"> · v24</span></div>
   </div>
   <div class="header-actions">
     <button class="btn btn-outline" id="fsBtn" onclick="toggleFullscreen()" style="display:none">⛶ 全屏</button>
@@ -2354,7 +2354,14 @@ function openBulkSellModal(preCustomer) {
   }).join("");
 
   showModal("记卖货 · 一次卖给一个客户", `
-    <div class="hint" style="margin-bottom:8px">勾上这次要卖的商品，填数量和卖价。同一张单只占一个单号、只打一张送货单；库存按「先进先出」自动扣。</div>
+    <div class="form-grid">
+      <div class="form-row"><label>卖货日期</label><input type="date" id="b-date" value="${today()}"></div>
+      <div class="form-row"><label>卖给谁（客户）*</label>
+        <input id="b-customer" list="dl-cust2" placeholder="客户名称">
+        <datalist id="dl-cust2">${customersInUse().map(c => `<option value="${esc(c)}">`).join("")}</datalist>
+      </div>
+    </div>
+    <div class="hint" style="margin-bottom:6px">先填日期和客户，再勾这次要卖的商品、填数量和卖价。同一张单只占一个单号、只打一张送货单；库存按「先进先出」自动扣。</div>
     <div class="pick-tools">
       <input id="pickSearch" placeholder="搜商品名称" oninput="filterPickRows(this.value)">
       <button type="button" class="btn btn-outline btn-sm" onclick="togglePickAll()">全选 / 取消</button>
@@ -2363,14 +2370,7 @@ function openBulkSellModal(preCustomer) {
       <div class="pick-head"><span></span><span>商品</span><span>数量</span><span>卖价</span></div>
       ${rows}
     </div>
-    <div class="form-grid" style="margin-top:12px">
-      <div class="form-row"><label>卖给谁（客户）*</label>
-        <input id="b-customer" list="dl-cust2" placeholder="客户名称">
-        <datalist id="dl-cust2">${customersInUse().map(c => `<option value="${esc(c)}">`).join("")}</datalist>
-      </div>
-      <div class="form-row"><label>卖货日期</label><input type="date" id="b-date" value="${today()}"></div>
-    </div>
-    <div class="form-row">
+    <div class="form-row" style="margin-top:12px">
       <label>本次实收金额（¥）— 没收全就填实际收到的</label>
       <div style="display:flex;gap:8px;align-items:center">
         <input type="number" id="b-paid" min="0" step="0.01" placeholder="0.00" style="flex:1">
