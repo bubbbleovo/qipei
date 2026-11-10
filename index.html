@@ -50,8 +50,11 @@
   .tag-low { background: #fef3c7; color: #b45309; }
   .modal-mask { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 100; align-items: flex-start; justify-content: center; overflow-y: auto; padding: 24px 12px 60px; }
   .modal-mask.show { display: flex; }
-  .modal { background: #fff; border-radius: 12px; padding: 18px; width: 100%; max-width: 500px; box-shadow: 0 10px 40px rgba(0,0,0,.22); }
-  .modal h3 { font-size: 16px; margin-bottom: 14px; color: #1e3a5f; }
+  .modal { position: relative; background: #fff; border-radius: 12px; padding: 18px; width: 100%; max-width: 500px; box-shadow: 0 10px 40px rgba(0,0,0,.22); }
+  .modal-x { position: absolute; top: 10px; right: 10px; width: 30px; height: 30px; border: none; border-radius: 50%;
+    background: #f3f4f6; color: #6b7280; font-size: 18px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .modal-x:active { background: #e5e7eb; color: #111827; }
+  .modal h3 { font-size: 16px; margin-bottom: 14px; color: #1e3a5f; padding-right: 34px; }
   .form-row { margin-bottom: 12px; }
   .form-row label { display: block; font-size: 12px; color: #4b5563; margin-bottom: 4px; font-weight: 500; }
   .form-row input, .form-row select, .form-row textarea { width: 100%; padding: 9px 10px; border: 1px solid #d1d5db; border-radius: 7px; font-size: 14px; font-family: inherit; background: #fff; }
@@ -117,6 +120,7 @@
   .buy-row input[type=number] { text-align: right; }
   .buy-row .lpk { display: block; font-size: 11px; color: #9ca3af; margin-top: 2px; line-height: 1.3; }
   .buy-row .lpk.hit { color: #16a34a; }
+  .buy-row .lpk.miss { color: #dc2626; font-weight: 600; }
   .buy-row .del { border: none; background: none; color: #dc2626; font-size: 14px; cursor: pointer; padding: 0; line-height: 1; opacity: .7; }
   .buy-row .del:active { opacity: 1; }
   .buy-total { font-size: 12px; color: #475569; margin-top: 8px; line-height: 1.7; }
@@ -244,7 +248,7 @@
 <div class="header">
   <div>
     <h1>🚚 嘉诺汽配 · 进销货记录</h1>
-    <div class="sub">卖多少记多少，库存自动算｜数据存本机，建议定期导出备份<span id="verTag" style="opacity:.55"> · v26</span> <span id="updTag" title="点一下检查有没有新版本" onclick="forceUpdate()" style="opacity:.7;cursor:pointer;text-decoration:underline">点此更新</span></div>
+    <div class="sub">卖多少记多少，库存自动算｜数据存本机，建议定期导出备份<span id="verTag" style="opacity:.55"> · v27</span> <span id="updTag" title="点一下检查有没有新版本" onclick="forceUpdate()" style="opacity:.7;cursor:pointer;text-decoration:underline">点此更新</span></div>
   </div>
   <div class="header-actions">
     <button class="btn btn-outline" id="fsBtn" onclick="toggleFullscreen()" style="display:none">⛶ 全屏</button>
@@ -285,6 +289,11 @@
   <!-- 库存 -->
   <section id="tab-stock" style="display:none">
     <div class="card">
+      <h2>⚠️ 库存提醒</h2>
+      <div class="hint" style="margin-bottom:10px">在库不到 2 个、已经卖完的商品都列在这里，好及时补货。</div>
+      <div class="table-wrap"><table id="alertTable"></table></div>
+    </div>
+    <div class="card">
       <h2>📦 当前库存（按商品汇总）</h2>
       <div class="hint" style="margin-bottom:10px">库存 = 进货总数 − 已卖出总数。每批货可以分多次卖，卖多少扣多少。</div>
       <div class="toolbar">
@@ -308,11 +317,6 @@
       <div id="stockSum"></div>
       <div class="table-wrap"><table id="stockTable"></table></div>
       <div id="pager-stock"></div>
-    </div>
-    <div class="card">
-      <h2>⚠️ 库存提醒</h2>
-      <div class="hint" style="margin-bottom:10px">在库不到 2 个、已经卖完的商品都列在这里，好及时补货。</div>
-      <div class="table-wrap"><table id="alertTable"></table></div>
     </div>
   </section>
 
@@ -446,6 +450,7 @@
 
 <div class="modal-mask" id="modalMask">
   <div class="modal">
+    <button type="button" class="modal-x" onclick="closeModal()" title="关闭（不会自动关闭，放心填）" aria-label="关闭">×</button>
     <h3 id="modalTitle"></h3>
     <div id="modalBody"></div>
     <div class="modal-actions">
@@ -1787,7 +1792,7 @@ function showModal(title, html, onSave) {
   document.getElementById("modalMask").classList.add("show");
 }
 function closeModal() { document.getElementById("modalMask").classList.remove("show"); }
-document.getElementById("modalMask").addEventListener("click", e => { if (e.target === e.currentTarget) closeModal(); });
+// 点弹窗外面不再自动关闭（容易误点，填了一半的内容会白写）；要关请点右上角 × 或「取消」
 function val(id) { const el = document.getElementById(id); return el ? (el.value || "").trim() : ""; }
 function numv(id) { const el = document.getElementById(id); const v = el ? parseFloat(el.value) : NaN; return isNaN(v) ? 0 : v; }
 function ensureCustomer(name) {
@@ -2339,19 +2344,111 @@ function bulkStocks() {
     .sort((a, b) => a.product.localeCompare(b.product, "zh"));
 }
 
+/* 一行一个商品：商品名 / 数量 / 卖价 */
+function sellRowHtml() {
+  return `<div class="buy-row sell-row">
+    <div><input class="sp" list="dl-sproduct" placeholder="商品名称" autocomplete="off"><span class="lpk"></span></div>
+    <input type="number" class="sq" min="0" step="1" inputmode="numeric" placeholder="个数">
+    <input type="number" class="sprice" min="0" step="0.01" inputmode="decimal" placeholder="0.00">
+    <button type="button" class="del" title="删掉这一行" onclick="delSellRow(this)">✕</button>
+  </div>`;
+}
+
+function sellRowsData() {
+  return [...document.querySelectorAll("#sellList .sell-row")].map(row => ({
+    row: row,
+    product: (row.querySelector(".sp").value || "").trim(),
+    qtyRaw: String(row.querySelector(".sq").value || "").trim(),
+    qty: parseFloat(row.querySelector(".sq").value) || 0,
+    priceRaw: String(row.querySelector(".sprice").value || "").trim(),
+    price: parseFloat(row.querySelector(".sprice").value) || 0
+  }));
+}
+
+function sellRowOfProduct(product) {
+  const p = String(product || "").trim();
+  if (!p) return null;
+  return [...document.querySelectorAll("#sellList .sell-row")]
+    .find(row => (row.querySelector(".sp").value || "").trim() === p) || null;
+}
+
+function addSellRow(focus) {
+  const listEl = document.getElementById("sellList");
+  if (!listEl) return null;
+  listEl.insertAdjacentHTML("beforeend", sellRowHtml());
+  const rows = listEl.querySelectorAll(".sell-row");
+  const last = rows[rows.length - 1];
+  if (last && focus !== false) {
+    const inp = last.querySelector(".sp");
+    if (inp && inp.focus) inp.focus();
+  }
+  refreshBulkHint();
+  return last;
+}
+
+function delSellRow(btn) {
+  const row = btn && btn.closest ? btn.closest(".sell-row") : null;
+  const listEl = document.getElementById("sellList");
+  if (!row || !listEl) return;
+  if (listEl.querySelectorAll(".sell-row").length <= 1) {
+    row.querySelector(".sp").value = "";
+    row.querySelector(".sq").value = "";
+    row.querySelector(".sprice").value = "";
+    const lpk = row.querySelector(".lpk");
+    if (lpk) { lpk.textContent = ""; lpk.className = "lpk"; }
+  } else {
+    row.remove();
+  }
+  refreshBulkHint();
+}
+
+/* 某商品现在还剩多少可卖 */
+function stockOfProduct(product) {
+  const st = productStats().find(x => x.product === product);
+  return st ? (Number(st.stockQty) || 0) : 0;
+}
+
+/* 输了商品名：带出库存和上次卖价，没库存就红字提醒 */
+function onSellProductInput(row) {
+  if (!row) return;
+  const p = (row.querySelector(".sp").value || "").trim();
+  const lpk = row.querySelector(".lpk");
+  const priceEl = row.querySelector(".sprice");
+  if (!p) {
+    if (lpk) { lpk.textContent = ""; lpk.className = "lpk"; }
+    refreshBulkHint();
+    return;
+  }
+  const known = productsInUse().includes(p);
+  const stock = stockOfProduct(p);
+  const lp = lastPriceOf(p);
+  if (priceEl && String(priceEl.value).trim() === "" && lp) priceEl.value = String(lp);
+  if (lpk) {
+    if (!known) {
+      lpk.textContent = "⚠ 没有这个商品的进货记录";
+      lpk.className = "lpk miss";
+    } else if (!(stock > 0.005)) {
+      lpk.textContent = "⚠ 已经没有库存了（卖完了）";
+      lpk.className = "lpk miss";
+    } else {
+      lpk.textContent = (stock < 2 ? "⚠ 只剩 " + qtyText(stock) : "可卖 " + qtyText(stock)) + " 个 · 上次卖 " + (lp ? money(lp) : "还没有");
+      lpk.className = stock < 2 ? "lpk miss" : "lpk hit";
+    }
+  }
+  refreshBulkHint();
+}
+
+function sellFilledRows() {
+  return sellRowsData().filter(d => d.product || d.qtyRaw !== "" || d.priceRaw !== "");
+}
+
 function openBulkSellModal(preCustomer) {
-  const stocks = bulkStocks();
-  if (!stocks.length) { alert("当前没有可卖的商品（库存都是 0）。\n\n先点「＋ 记进货」记进货，再来卖。"); return; }
+  if (!productsInUse().length) {
+    alert("还没有任何进货记录。\n\n先点「＋ 记进货」记一笔，再来卖。");
+    return;
+  }
   bulkCtx = { paidTouched: false };
-  const rows = stocks.map(s => {
-    const lp = lastPriceOf(s.product);
-    return `<div class="pick-row" data-product="${esc(s.product)}">
-      <input type="checkbox" class="pick-chk">
-      <div class="nm">${esc(s.product)}<span class="sm">可卖 ${qtyText(s.stockQty)} 个 · 进价均价 ${money(s.inQty ? s.inValue / s.inQty : 0)}</span></div>
-      <input type="number" class="pick-qty" min="0" step="1" inputmode="numeric" placeholder="个数">
-      <input type="number" class="pick-price" min="0" step="0.01" inputmode="decimal" value="${lp ? lp : ""}" placeholder="0.00">
-    </div>`;
-  }).join("");
+  const prodOpts = productsInUse().map(p => `<option value="${esc(p)}">`).join("");
 
   showModal("记卖货 · 一次卖给一个客户", `
     <div class="form-grid">
@@ -2361,14 +2458,13 @@ function openBulkSellModal(preCustomer) {
         <datalist id="dl-cust2">${customersInUse().map(c => `<option value="${esc(c)}">`).join("")}</datalist>
       </div>
     </div>
-    <div class="hint" style="margin-bottom:6px">先填日期和客户，再勾这次要卖的商品、填数量和卖价。同一张单只占一个单号、只打一张送货单；库存按「先进先出」自动扣。</div>
-    <div class="pick-tools">
-      <input id="pickSearch" placeholder="搜商品名称" oninput="filterPickRows(this.value)">
-      <button type="button" class="btn btn-outline btn-sm" onclick="togglePickAll()">全选 / 取消</button>
+    <div class="hint" style="margin-bottom:6px">一行一个商品：填商品名、数量、卖价。没库存或不够卖的，商品名下面会红字提醒。</div>
+    <div class="buy-list" id="sellList">
+      <div class="buy-head"><span>商品名称</span><span>数量</span><span>卖价/个</span><span></span></div>
+      ${sellRowHtml() + sellRowHtml()}
     </div>
-    <div class="pick-list" id="pickList">
-      <div class="pick-head"><span></span><span>商品</span><span>数量</span><span>卖价</span></div>
-      ${rows}
+    <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+      <button type="button" class="btn btn-outline btn-sm" onclick="addSellRow()">＋ 再加一行</button>
     </div>
     <div class="form-row" style="margin-top:12px">
       <label>本次实收金额（¥）— 没收全就填实际收到的</label>
@@ -2379,32 +2475,43 @@ function openBulkSellModal(preCustomer) {
       </div>
     </div>
     <div class="hint" id="bulkHint"></div>
+    <datalist id="dl-sproduct">${prodOpts}</datalist>
   `, () => {
     const cust = val("b-customer");
     if (!cust) { alert("请填写客户名称（客户记录单要用）"); return false; }
-    const stockMap = {};
-    productStats().forEach(s => { stockMap[s.product] = s.stockQty; });
+
+    const filled = sellFilledRows();
+    if (!filled.length) { alert("请至少填一个商品"); return false; }
+
     const picks = [];
-    document.querySelectorAll("#pickList .pick-row").forEach(row => {
-      const chk = row.querySelector(".pick-chk");
-      if (!chk || !chk.checked) return;
-      const qRaw = String(row.querySelector(".pick-qty").value || "").trim();
-      picks.push({
-        product: row.dataset.product,
-        qty: parseFloat(qRaw) || 0,
-        price: parseFloat(row.querySelector(".pick-price").value) || 0,
-        qtyFilled: qRaw !== ""
-      });
-    });
-    if (!picks.length) { alert("请先勾选要卖的商品"); return false; }
-    for (const pk of picks) {
-      if (!pk.qtyFilled) { alert(`「${pk.product}」还没填卖出数量`); return false; }
-      if (!(pk.qty > 0)) { alert(`「${pk.product}」的卖出数量要大于 0`); return false; }
-      if (pk.qty > (stockMap[pk.product] || 0) + 1e-9) {
-        alert(`「${pk.product}」最多只能卖 ${qtyText(stockMap[pk.product] || 0)} 个`);
+    for (const d of filled) {
+      if (!d.product) { alert("有一行填了数量或卖价，但没写商品名称"); return false; }
+      if (d.qtyRaw === "") { alert(`「${d.product}」还没填卖出数量`); return false; }
+      if (!(d.qty > 0)) { alert(`「${d.product}」的卖出数量要大于 0`); return false; }
+      picks.push({ product: d.product, qty: d.qty, price: Math.max(0, d.price) });
+    }
+
+    // 合起来看库存（同一个商品可能填了两行）
+    const need = {};
+    picks.forEach(x => { need[x.product] = Math.round(((need[x.product] || 0) + x.qty) * 100) / 100; });
+    const stockMap = {};
+    productStats().forEach(x => { stockMap[x.product] = x.stockQty; });
+    for (const name of Object.keys(need)) {
+      if (!productsInUse().includes(name)) {
+        alert(`「${name}」没有进货记录，商品名是不是写错了？\n\n名称要和「记进货」时填的一模一样。`);
+        return false;
+      }
+      const st = Number(stockMap[name]) || 0;
+      if (!(st > 0.005)) {
+        alert(`「${name}」已经没有库存了（现在 0 个）。\n\n先用「＋ 记进货」记一笔，再来卖。`);
+        return false;
+      }
+      if (need[name] > st + 1e-9) {
+        alert(`「${name}」只剩 ${qtyText(st)} 个，卖不了 ${qtyText(need[name])} 个。\n\n少卖一点，或者先记进货。`);
         return false;
       }
     }
+
     const res = createBulkOrder(picks, cust, val("b-date") || today(), document.getElementById("b-paid"));
     ensureCustomer(cust);
     save(); renderAll();
@@ -2412,21 +2519,16 @@ function openBulkSellModal(preCustomer) {
     return true;
   });
 
-  const listEl = document.getElementById("pickList");
+  const listEl = document.getElementById("sellList");
   if (listEl && listEl.addEventListener) {
-    listEl.addEventListener("change", e => {
-      const row = e.target.closest ? e.target.closest(".pick-row") : null;
-      if (!row) return;
-      if (e.target.classList.contains("pick-chk")) row.classList.toggle("on", e.target.checked);
+    listEl.addEventListener("input", e => {
+      const row = e.target.closest ? e.target.closest(".sell-row") : null;
+      if (row && e.target.classList.contains("sp")) { onSellProductInput(row); return; }
       refreshBulkHint();
     });
-    listEl.addEventListener("input", e => {
-      const row = e.target.closest ? e.target.closest(".pick-row") : null;
-      if (row && (e.target.classList.contains("pick-qty") || e.target.classList.contains("pick-price"))) {
-        const chk = row.querySelector(".pick-chk");
-        if (chk && !chk.checked) { chk.checked = true; row.classList.add("on"); }
-      }
-      refreshBulkHint();
+    listEl.addEventListener("change", e => {
+      const row = e.target.closest ? e.target.closest(".sell-row") : null;
+      if (row && e.target.classList.contains("sp")) onSellProductInput(row);
     });
   }
   const paidInput = document.getElementById("b-paid");
@@ -2441,22 +2543,15 @@ function openBulkSellModal(preCustomer) {
   refreshBulkHint();
 }
 
-function pickedRows() {
-  return [...document.querySelectorAll("#pickList .pick-row")].filter(row => {
-    const chk = row.querySelector(".pick-chk");
-    return chk && chk.checked;
-  });
-}
 function bulkSum() {
-  let total = 0, qty = 0;
-  const rows = pickedRows();
-  rows.forEach(row => {
-    const q = parseFloat(row.querySelector(".pick-qty").value) || 0;
-    const p = parseFloat(row.querySelector(".pick-price").value) || 0;
-    total += q * p; qty += q;
+  let total = 0, qty = 0, n = 0;
+  sellFilledRows().forEach(d => {
+    if (!d.product) return;
+    n += 1; total += d.qty * d.price; qty += d.qty;
   });
-  return { total: total, qty: qty, n: rows.length };
+  return { total: Math.round(total * 100) / 100, qty: qty, n: n };
 }
+
 function refreshBulkHint() {
   const el = document.getElementById("bulkHint");
   if (!el) return;
@@ -2466,40 +2561,20 @@ function refreshBulkHint() {
   const raw = paidEl ? String(paidEl.value).trim() : "";
   const paid = raw === "" ? s.total : Math.max(0, Math.min(parseFloat(raw) || 0, s.total));
   const debt = Math.round((s.total - paid) * 100) / 100;
-  if (!s.n) { el.textContent = "还没有勾选商品：勾上之后再填数量和卖价。"; return; }
-  if (!(s.qty > 0)) { el.innerHTML = `已勾 <b>${s.n}</b> 种商品，把<b>数量</b>填上就能算钱。`; return; }
-  el.innerHTML = `已选 <b>${s.n}</b> 种，共 <b>${qtyText(s.qty)}</b> 个，应收 <b>${money(s.total)}</b><br>`
+  if (!s.n) { el.textContent = "还没有填商品：填上商品名、数量、卖价就能算钱。"; return; }
+  if (!(s.qty > 0)) { el.innerHTML = `已填 <b>${s.n}</b> 种商品，把<b>数量</b>填上就能算钱。`; return; }
+  el.innerHTML = `已填 <b>${s.n}</b> 种，共 <b>${qtyText(s.qty)}</b> 个，应收 <b>${money(s.total)}</b><br>`
     + (debt > 0.005
       ? `实收 <b class="paid-num">${money(paid)}</b>，<b class="debt-num">还欠 ${money(debt)}</b>（之后在「客户记录」里点「收款」登记）`
       : `实收 <b class="paid-num">${money(paid)}</b> · 已结清 ✓`);
 }
+
 function fillBulkPaid(mode) {
   const el = document.getElementById("b-paid");
   if (!el) return;
   const t = bulkSum().total;
   el.value = mode === "zero" ? "0" : (t > 0 ? String(Math.round(t * 100) / 100) : "");
   bulkCtx.paidTouched = (mode === "zero");
-  refreshBulkHint();
-}
-function filterPickRows(kw) {
-  kw = String(kw || "").toLowerCase().trim();
-  document.querySelectorAll("#pickList .pick-row").forEach(row => {
-    const hit = !kw || String(row.dataset.product || "").toLowerCase().includes(kw);
-    row.style.display = hit ? "" : "none";
-  });
-}
-function togglePickAll() {
-  const rows = [...document.querySelectorAll("#pickList .pick-row")].filter(r => r.style.display !== "none");
-  const allOn = rows.length > 0 && rows.every(r => {
-    const c = r.querySelector(".pick-chk");
-    return c && c.checked;
-  });
-  rows.forEach(r => {
-    const c = r.querySelector(".pick-chk");
-    if (!c) return;
-    c.checked = !allOn;
-    r.classList.toggle("on", !allOn);
-  });
   refreshBulkHint();
 }
 
