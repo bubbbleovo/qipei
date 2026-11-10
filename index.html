@@ -244,7 +244,7 @@
 <div class="header">
   <div>
     <h1>🚚 嘉诺汽配 · 进销货记录</h1>
-    <div class="sub">卖多少记多少，库存自动算｜数据存本机，建议定期导出备份<span id="verTag" style="opacity:.55"> · v25</span></div>
+    <div class="sub">卖多少记多少，库存自动算｜数据存本机，建议定期导出备份<span id="verTag" style="opacity:.55"> · v26</span> <span id="updTag" title="点一下检查有没有新版本" onclick="forceUpdate()" style="opacity:.7;cursor:pointer;text-decoration:underline">点此更新</span></div>
   </div>
   <div class="header-actions">
     <button class="btn btn-outline" id="fsBtn" onclick="toggleFullscreen()" style="display:none">⛶ 全屏</button>
@@ -3133,6 +3133,28 @@ window.__app = {
   set db(v) { db = v; save(); },
   save: save, renderAll: renderAll
 };
+// 一键更新：清掉旧缓存和 Service Worker，再带时间戳重新进入（只清代码缓存，不动本地数据）
+async function forceUpdate() {
+  const mask = document.getElementById("modalMask");
+  if (mask && mask.classList.contains("show")) {
+    if (!confirm("现在有窗口正开着，更新会丢掉没保存的内容。\n\n确定要更新吗？")) return;
+    if (typeof closeModal === "function") { try { closeModal(); } catch (e) {} }
+  }
+  const tag = document.getElementById("updTag");
+  if (tag) tag.textContent = "更新中…";
+  try {
+    if (window.caches) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+    }
+    if ("serviceWorker" in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+    }
+  } catch (e) {}
+  location.replace(location.pathname + "?u=" + Date.now() + (location.hash || ""));
+}
+
 if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
   const hadController = !!navigator.serviceWorker.controller;
   let reloading = false;
