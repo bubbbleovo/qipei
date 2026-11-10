@@ -244,7 +244,7 @@
 <div class="header">
   <div>
     <h1>🚚 嘉诺汽配 · 进销货记录</h1>
-    <div class="sub">卖多少记多少，库存自动算｜数据存本机，建议定期导出备份<span id="verTag" style="opacity:.55"> · v24</span></div>
+    <div class="sub">卖多少记多少，库存自动算｜数据存本机，建议定期导出备份<span id="verTag" style="opacity:.55"> · v25</span></div>
   </div>
   <div class="header-actions">
     <button class="btn btn-outline" id="fsBtn" onclick="toggleFullscreen()" style="display:none">⛶ 全屏</button>
@@ -2348,7 +2348,7 @@ function openBulkSellModal(preCustomer) {
     return `<div class="pick-row" data-product="${esc(s.product)}">
       <input type="checkbox" class="pick-chk">
       <div class="nm">${esc(s.product)}<span class="sm">可卖 ${qtyText(s.stockQty)} 个 · 进价均价 ${money(s.inQty ? s.inValue / s.inQty : 0)}</span></div>
-      <input type="number" class="pick-qty" min="1" step="1" inputmode="numeric" value="1">
+      <input type="number" class="pick-qty" min="0" step="1" inputmode="numeric" placeholder="个数">
       <input type="number" class="pick-price" min="0" step="0.01" inputmode="decimal" value="${lp ? lp : ""}" placeholder="0.00">
     </div>`;
   }).join("");
@@ -2388,14 +2388,17 @@ function openBulkSellModal(preCustomer) {
     document.querySelectorAll("#pickList .pick-row").forEach(row => {
       const chk = row.querySelector(".pick-chk");
       if (!chk || !chk.checked) return;
+      const qRaw = String(row.querySelector(".pick-qty").value || "").trim();
       picks.push({
         product: row.dataset.product,
-        qty: parseFloat(row.querySelector(".pick-qty").value) || 0,
-        price: parseFloat(row.querySelector(".pick-price").value) || 0
+        qty: parseFloat(qRaw) || 0,
+        price: parseFloat(row.querySelector(".pick-price").value) || 0,
+        qtyFilled: qRaw !== ""
       });
     });
     if (!picks.length) { alert("请先勾选要卖的商品"); return false; }
     for (const pk of picks) {
+      if (!pk.qtyFilled) { alert(`「${pk.product}」还没填卖出数量`); return false; }
       if (!(pk.qty > 0)) { alert(`「${pk.product}」的卖出数量要大于 0`); return false; }
       if (pk.qty > (stockMap[pk.product] || 0) + 1e-9) {
         alert(`「${pk.product}」最多只能卖 ${qtyText(stockMap[pk.product] || 0)} 个`);
@@ -2464,6 +2467,7 @@ function refreshBulkHint() {
   const paid = raw === "" ? s.total : Math.max(0, Math.min(parseFloat(raw) || 0, s.total));
   const debt = Math.round((s.total - paid) * 100) / 100;
   if (!s.n) { el.textContent = "还没有勾选商品：勾上之后再填数量和卖价。"; return; }
+  if (!(s.qty > 0)) { el.innerHTML = `已勾 <b>${s.n}</b> 种商品，把<b>数量</b>填上就能算钱。`; return; }
   el.innerHTML = `已选 <b>${s.n}</b> 种，共 <b>${qtyText(s.qty)}</b> 个，应收 <b>${money(s.total)}</b><br>`
     + (debt > 0.005
       ? `实收 <b class="paid-num">${money(paid)}</b>，<b class="debt-num">还欠 ${money(debt)}</b>（之后在「客户记录」里点「收款」登记）`
