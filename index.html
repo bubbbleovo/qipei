@@ -244,7 +244,7 @@
 <div class="header">
   <div>
     <h1>🚚 嘉诺汽配 · 进销货记录</h1>
-    <div class="sub">卖多少记多少，库存自动算｜数据存本机，建议定期导出备份<span id="verTag" style="opacity:.55"> · v22</span></div>
+    <div class="sub">卖多少记多少，库存自动算｜数据存本机，建议定期导出备份<span id="verTag" style="opacity:.55"> · v23</span></div>
   </div>
   <div class="header-actions">
     <button class="btn btn-outline" id="fsBtn" onclick="toggleFullscreen()" style="display:none">⛶ 全屏</button>
@@ -1339,6 +1339,7 @@ function renderStock() {
       <td class="num">${qtyText(s.soldQty)} 个</td>
       <td><div class="row-actions">
         <button class="btn btn-outline btn-sm" data-product="${esc(s.product)}" onclick="showProductRecords(this.dataset.product)">看记录</button>
+        <button class="btn btn-primary btn-sm" data-product="${esc(s.product)}" onclick="openStockEdit(this.dataset.product)">改数量</button>
       </div></td>
     </tr>`).join("")}</tbody>`;
   const pEl = document.getElementById("pager-stock");
@@ -1675,7 +1676,10 @@ function renderStockAlerts() {
       <td class="num">${qtyText(s.stockQty)}</td>
       <td>${s.stockQty <= 0 ? '<span class="tag tag-out">已卖完</span>' : '<span class="tag tag-low">库存偏低</span>'}</td>
       <td class="num">${lastPriceOf(s.product) > 0 ? money(lastPriceOf(s.product)) : '<span class="muted">-</span>'}</td>
-      <td><button class="btn btn-outline btn-sm" data-product="${esc(s.product)}" onclick="showProductRecords(this.dataset.product)">看记录</button></td>
+      <td><div class="row-actions">
+        <button class="btn btn-outline btn-sm" data-product="${esc(s.product)}" onclick="showProductRecords(this.dataset.product)">看记录</button>
+        <button class="btn btn-primary btn-sm" data-product="${esc(s.product)}" onclick="openStockEdit(this.dataset.product)">改数量</button>
+      </div></td>
     </tr>`).join("")}</tbody>` : `<tbody><tr><td colspan="5"><div class="empty-tip">👍 暂无提醒，库存都还够</div></td></tr></tbody>`;
 }
 
@@ -2020,6 +2024,87 @@ function focusBuyProduct() {
     target = all[all.length - 1];
   }
   if (target) { const inp = target.querySelector(".bp"); if (inp) inp.focus(); }
+}
+
+/* ================= 弹窗：改库存数量（盘点调整） ================= */
+// 某商品的批次，最近的排前面（调整库存时优先从最近进的批次里扣）
+function stockBatchesNewest(product) {
+  return db.records
+    .filter(r => r.product === product)
+    .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")) || (Number(b.id) || 0) - (Number(a.id) || 0));
+}
+
+function openStockEdit(product) {
+  if (!product) return;
+  const st = productStats(product)[0] || { stockQty: 0, inQty: 0, soldQty: 0 };
+  const now = Math.round((Number(st.stockQty) || 0) * 100) / 100;
+  const lastCost = Number(lastCostOf(product)) || 0;
+
+  showModal("改库存数量 · " + product, `
+    <div class="batch-info">
+      现在在库 <b>${qtyText(now)}</b> 个 · 累计进 ${qtyText(st.inQty)} 个 · 已卖 ${qtyText(st.soldQty)} 个<br>
+      盘货后按实际数出来的个数填，系统自动补上或减掉差额。
+    </div>
+    <div class="form-grid" style="margin-top:12px">
+      <div class="form-row"><label>实际在库个数 *</label><input type="number" id="k-qty" min="0" step="1" inputmode="numeric" value="${qtyText(now)}"></div>
+      <div class="form-row"><label>调整备注</label><input id="k-note" value="库存调整" placeholder="库存调整"></div>
+    </div>
+    <div class="hint" id="kHint"></div>
+  `, () => {
+    const raw = String(document.getElementById("k-qty").value || "").trim();
+    const n = parseFloat(raw);
+    if (raw === "" || isNaN(n) || n < 0) { alert("请填写正确的在库个数（0 或以上）"); return false; }
+    const target = Math.round(n * 100) / 100;
+    const delta = Math.round((target - now) * 100) / 100;
+    if (Math.abs(delta) < 0.005) { toast("库存没变，不用调整"); return true; }
+    const note = val("k-note") || "库存调整";
+
+    if (delta > 0) {
+      // 少了：补一笔进货，按最近进价算成本，备注写清楚是盘点
+      db.records.push({
+        id: nextId(), date: today(), product: product, qty: delta,
+        cost: lastCost, supplier: "", note: note, sales: []
+      });
+    } else {
+      // 多了：从最近进的批次里扣，先算好再改，扣不动就整体不做
+      let need = -delta;
+      const plan = [];
+      stockBatchesNewest(product).forEach(r => {
+        if (need <= 0.005) return;
+        const free = stockOf(r);
+        if (free <= 0.005) return;
+        const take = Math.min(free, need);
+        plan.push([r, take]);
+        need = Math.round((need - take) * 100) / 100;
+      });
+      if (need > 0.005) {
+        alert("能减的库存不够（有些已经卖出去了）。\n\n先到「进销货记录」核对该商品的卖出记录，再调库存。");
+        return false;
+      }
+      plan.forEach(([r, take]) => {
+        r.qty = Math.round(((Number(r.qty) || 0) - take) * 100) / 100;
+      });
+    }
+
+    save(); renderAll();
+    toast("「" + product + "」库存已改成 " + qtyText(target) + " 个");
+    return true;
+  });
+
+  const qel = document.getElementById("k-qty");
+  if (qel && qel.addEventListener) {
+    qel.addEventListener("input", () => {
+      const h = document.getElementById("kHint");
+      if (!h) return;
+      const v = parseFloat(qel.value);
+      if (isNaN(v) || v < 0) { h.textContent = "填 0 或以上的个数"; return; }
+      const d = Math.round((v - now) * 100) / 100;
+      if (Math.abs(d) < 0.005) { h.textContent = "数量没变，保存不会改动库存"; return; }
+      h.innerHTML = d > 0
+        ? "会补 <b>" + qtyText(d) + "</b> 个（按最近进价 " + money(lastCost) + "/个 记一笔进货）"
+        : "会从最近进的批次里减掉 <b>" + qtyText(-d) + "</b> 个";
+    });
+  }
 }
 
 /* ================= 弹窗：卖出一笔 ================= */
