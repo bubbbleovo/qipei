@@ -206,23 +206,23 @@
   .shop-edit { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; padding: 9px 12px; background: #fff; border-bottom: 1px solid #e5e7eb; font-size: 12px; color: #6b7280; }
   .shop-edit input { padding: 6px 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 12px; font-family: inherit; }
   .shop-edit input.w-sm { width: 70px; }
-  .slip-sheet { background: #fff; max-width: 720px; margin: 12px auto 40px; padding: 26px 30px 40px; color: #111827; font-size: 14px; line-height: 1.6; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+  .slip-sheet { background: #fff; max-width: 720px; margin: 12px auto 40px; padding: 26px 30px 40px; color: #111827; font-size: 16px; line-height: 1.6; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
   .slip-head { text-align: center; border-bottom: 2px solid #111827; padding-bottom: 10px; margin-bottom: 14px; }
-  .slip-head .shop-name { font-size: 22px; font-weight: 700; letter-spacing: 3px; }
-  .slip-head .shop-sub { font-size: 12px; color: #4b5563; margin-top: 3px; }
-  .slip-head .doc-title { font-size: 16px; font-weight: 700; margin-top: 7px; letter-spacing: 4px; }
-  .slip-meta { display: flex; flex-wrap: wrap; gap: 4px 26px; font-size: 13px; margin-bottom: 12px; }
+  .slip-head .shop-name { font-size: 26px; font-weight: 700; letter-spacing: 3px; }
+  .slip-head .shop-sub { font-size: 14px; color: #4b5563; margin-top: 3px; }
+  .slip-head .doc-title { font-size: 19px; font-weight: 700; margin-top: 7px; letter-spacing: 4px; }
+  .slip-meta { display: flex; flex-wrap: wrap; gap: 4px 26px; font-size: 15px; margin-bottom: 12px; }
   .slip-table { width: 100%; border-collapse: collapse; min-width: 0; }
-  .slip-table th, .slip-table td { border: 1px solid #374151; padding: 7px 8px; font-size: 13px; }
+  .slip-table th, .slip-table td { border: 1px solid #374151; padding: 8px 10px; font-size: 15.5px; }
   .slip-table th { background: #f3f4f6; font-weight: 600; }
-  .slip-foot { margin-top: 12px; font-size: 13px; line-height: 2; }
+  .slip-foot { margin-top: 12px; font-size: 15px; line-height: 2; }
   .slip-foot .row { display: flex; justify-content: flex-end; gap: 18px; }
   .slip-foot .row b { min-width: 96px; text-align: right; }
-  .slip-sign { display: flex; justify-content: space-between; gap: 20px; margin-top: 36px; font-size: 13px; color: #374151; }
-  .slip-sign span { border-top: 1px solid #9ca3af; padding-top: 4px; min-width: 130px; }
-  .slip-biz { margin-top: 20px; font-size: 14.5px; line-height: 1.9; color: #111827; }
+  .slip-sign { display: flex; justify-content: space-between; gap: 20px; margin-top: 36px; font-size: 15px; color: #374151; }
+  .slip-sign span { border-top: 1px solid #9ca3af; padding-top: 4px; min-width: 150px; }
+  .slip-biz { margin-top: 20px; font-size: 16.5px; line-height: 1.9; color: #111827; }
   .slip-biz div { margin-bottom: 1px; }
-  .slip-note { margin-top: 20px; font-size: 14px; color: #6b7280; border-top: 1px dashed #d1d5db; padding-top: 8px; }
+  .slip-note { margin-top: 20px; font-size: 15.5px; color: #6b7280; border-top: 1px dashed #d1d5db; padding-top: 8px; }
   /* 送货单保存图片 */
   .img-overlay { display: none; position: fixed; inset: 0; background: #111827; overflow: auto; z-index: 320; -webkit-overflow-scrolling: touch; }
   .img-overlay.show { display: block; }
@@ -249,7 +249,7 @@
 <div class="header">
   <div>
     <h1>🚚 嘉诺汽配 · 进销货记录</h1>
-    <div class="sub">卖多少记多少，库存自动算｜数据存本机，建议定期导出备份<span id="verTag" style="opacity:.55"> · v28</span> <span id="updTag" title="点一下检查有没有新版本" onclick="forceUpdate()" style="opacity:.7;cursor:pointer;text-decoration:underline">点此更新</span></div>
+    <div class="sub">卖多少记多少，库存自动算｜数据存本机，建议定期导出备份<span id="verTag" style="opacity:.55"> · v29</span> <span id="updTag" title="点一下检查有没有新版本" onclick="forceUpdate()" style="opacity:.7;cursor:pointer;text-decoration:underline">点此更新</span></div>
   </div>
   <div class="header-actions">
     <button class="btn btn-outline" id="fsBtn" onclick="toggleFullscreen()" style="display:none">⛶ 全屏</button>
@@ -3080,17 +3080,17 @@ function renderSlipImage(d) {
     return s + "…";
   };
 
-  const bizFont = F(14.5);
+  const bizFont = F(16.5);
   const bizLines = [SHOP_BIZ, SHOP_ADDR, SHOP_TEL].reduce((acc, t) => acc.concat(wrapText(t, inner - 4, bizFont)), []);
 
-  const headH = 34 + (d.shopPhone ? 18 : 0) + 28 + 18 + 44;
+  const headH = 38 + (d.shopPhone ? 20 : 0) + 34 + 20 + 48;
   const rows = Math.max(4, d.lines.length);
-  const rowH = 38, headH2 = 34, footH = 44;
+  const rowH = 44, headH2 = 40, footH = 50;
   const tableTop = PAD + headH;
   const tableBottom = tableTop + headH2 + rows * rowH + footH;
   const bizTop = tableBottom + 22;
-  const signY = bizTop + bizLines.length * 26 + 40;
-  const noteY = signY + 44;
+  const signY = bizTop + bizLines.length * 30 + 46;
+  const noteY = signY + 50;
   const H = noteY + 36 + PAD;
 
   const cv = document.createElement("canvas");
@@ -3110,22 +3110,22 @@ function renderSlipImage(d) {
   };
 
   let y = PAD;
-  put(d.shop || "嘉诺汽配", W / 2, y + 16, F(24, 700), "#111827", "center");
+  put(d.shop || "嘉诺汽配", W / 2, y + 19, F(28, 700), "#111827", "center");
+  y += 38;
+  if (d.shopPhone) { put("电话 " + d.shopPhone, W / 2, y + 10, F(14), "#4b5563", "center"); y += 20; }
+  put("送 货 单", W / 2, y + 16, F(20, 700), "#111827", "center");
   y += 34;
-  if (d.shopPhone) { put("电话 " + d.shopPhone, W / 2, y + 9, F(12), "#4b5563", "center"); y += 18; }
-  put("送 货 单", W / 2, y + 14, F(17, 700), "#111827", "center");
-  y += 30;
 
   ctx.strokeStyle = "#111827";
   ctx.lineWidth = 2;
   ctx.beginPath(); ctx.moveTo(PAD, y); ctx.lineTo(W - PAD, y); ctx.stroke();
   y += 18;
 
-  put("单号：" + (d.no || ""), PAD, y + 8, F(12.5));
-  put("日期：" + (d.date || ""), PAD + 330, y + 8, F(12.5));
-  y += 22;
-  put("客户：" + (d.customer || "—"), PAD, y + 8, F(12.5));
-  put("电话：" + (d.custPhone || "—"), PAD + 330, y + 8, F(12.5));
+  put("单号：" + (d.no || ""), PAD, y + 9, F(14.5));
+  put("日期：" + (d.date || ""), PAD + 330, y + 9, F(14.5));
+  y += 26;
+  put("客户：" + (d.customer || "—"), PAD, y + 9, F(14.5));
+  put("电话：" + (d.custPhone || "—"), PAD + 330, y + 9, F(14.5));
 
   // 表格
   const hline = yy => { ctx.beginPath(); ctx.moveTo(PAD, yy); ctx.lineTo(W - PAD, yy); ctx.stroke(); };
@@ -3140,25 +3140,25 @@ function renderSlipImage(d) {
 
   const c0 = (xs[0] + xs[1]) / 2, c2 = (xs[2] + xs[3]) / 2, c3 = (xs[3] + xs[4]) / 2;
   const headY = tableTop + headH2 / 2;
-  put("序号", c0, headY, F(12.5, 600), "#111827", "center");
-  put("品名 / 规格", xs[1] + 10, headY, F(12.5, 600));
-  put("数量", c2, headY, F(12.5, 600), "#111827", "center");
-  put("单价", c3, headY, F(12.5, 600), "#111827", "center");
-  put("金额", xs[5] - 10, headY, F(12.5, 600), "#111827", "right");
+  put("序号", c0, headY, F(14.5, 600), "#111827", "center");
+  put("品名 / 规格", xs[1] + 10, headY, F(14.5, 600));
+  put("数量", c2, headY, F(14.5, 600), "#111827", "center");
+  put("单价", c3, headY, F(14.5, 600), "#111827", "center");
+  put("金额", xs[5] - 10, headY, F(14.5, 600), "#111827", "right");
 
   d.lines.forEach((l, i) => {
     const cy = tableTop + headH2 + i * rowH + rowH / 2;
-    put(String(i + 1), c0, cy, F(12.5), "#111827", "center");
-    put(cutText(l.product, colName - 22, F(12.5, 600)), xs[1] + 9, l.note ? cy - 7 : cy, F(12.5, 600));
-    if (l.note) put(cutText(l.note, colName - 22, F(11)), xs[1] + 9, cy + 9, F(11), "#4b5563");
-    put(qtyText(l.qty), c2, cy, F(12.5), "#111827", "center");
-    put(money(l.price), xs[4] - 8, cy, F(12.5), "#111827", "right");
-    put(money(l.amount), xs[5] - 10, cy, F(12.5), "#111827", "right");
+    put(String(i + 1), c0, cy, F(14.5), "#111827", "center");
+    put(cutText(l.product, colName - 22, F(14.5, 600)), xs[1] + 9, l.note ? cy - 8 : cy, F(14.5, 600));
+    if (l.note) put(cutText(l.note, colName - 22, F(12.5)), xs[1] + 9, cy + 10, F(12.5), "#4b5563");
+    put(qtyText(l.qty), c2, cy, F(14.5), "#111827", "center");
+    put(money(l.price), xs[4] - 8, cy, F(14.5), "#111827", "right");
+    put(money(l.amount), xs[5] - 10, cy, F(14.5), "#111827", "right");
   });
 
   const footY = tableTop + headH2 + rows * rowH + footH / 2;
-  put("金额大写：" + rmbUpper(d.total), xs[0] + 10, footY, F(12.5, 700));
-  put(money(d.total), xs[5] - 10, footY, F(13, 700), "#111827", "right");
+  put("金额大写：" + rmbUpper(d.total), xs[0] + 10, footY, F(14.5, 700));
+  put(money(d.total), xs[5] - 10, footY, F(15, 700), "#111827", "right");
 
   // 业务范围 / 地址 / 电话
   bizLines.forEach((ln, i) => put(ln, PAD, bizTop + i * 26, bizFont, "#111827"));
@@ -3170,7 +3170,7 @@ function renderSlipImage(d) {
     ctx.strokeStyle = "#9ca3af";
     ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(x0, signY); ctx.lineTo(x0 + signW, signY); ctx.stroke();
-    put(t, x0, signY + 16, F(12.5), "#374151");
+    put(t, x0, signY + 18, F(14.5), "#374151");
   });
 
   // 底部说明（与打印版保持一致）
@@ -3179,7 +3179,7 @@ function renderSlipImage(d) {
   if (ctx.setLineDash) ctx.setLineDash([4, 4]);
   ctx.beginPath(); ctx.moveTo(PAD, noteY); ctx.lineTo(W - PAD, noteY); ctx.stroke();
   if (ctx.setLineDash) ctx.setLineDash([]);
-  put(SLIP_NOTE, PAD, noteY + 17, F(14), "#6b7280");
+  put(SLIP_NOTE, PAD, noteY + 19, F(15.5), "#6b7280");
 
   try { return cv.toDataURL("image/png"); } catch (e) { return ""; }
 }
