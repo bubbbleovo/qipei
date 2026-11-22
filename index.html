@@ -249,7 +249,7 @@
 <div class="header">
   <div>
     <h1>🚚 嘉诺汽配 · 进销货记录</h1>
-    <div class="sub">卖多少记多少，库存自动算｜数据存本机，建议定期导出备份<span id="verTag" style="opacity:.55"> · v29</span> <span id="updTag" title="点一下检查有没有新版本" onclick="forceUpdate()" style="opacity:.7;cursor:pointer;text-decoration:underline">点此更新</span></div>
+    <div class="sub">卖多少记多少，库存自动算｜数据存本机，建议定期导出备份<span id="verTag" style="opacity:.55"> · v30</span> <span id="updTag" title="点一下检查有没有新版本" onclick="forceUpdate()" style="opacity:.7;cursor:pointer;text-decoration:underline">点此更新</span></div>
   </div>
   <div class="header-actions">
     <button class="btn btn-outline" id="fsBtn" onclick="toggleFullscreen()" style="display:none">⛶ 全屏</button>
@@ -290,11 +290,6 @@
   <!-- 库存 -->
   <section id="tab-stock" style="display:none">
     <div class="card">
-      <h2>⚠️ 库存提醒</h2>
-      <div class="hint" style="margin-bottom:10px">在库不到 2 个、已经卖完的商品都列在这里，好及时补货。</div>
-      <div class="table-wrap"><table id="alertTable"></table></div>
-    </div>
-    <div class="card">
       <h2>📦 当前库存（按商品汇总）</h2>
       <div class="hint" style="margin-bottom:10px">库存 = 进货总数 − 已卖出总数。每批货可以分多次卖，卖多少扣多少。</div>
       <div class="toolbar">
@@ -318,6 +313,11 @@
       <div id="stockSum"></div>
       <div class="table-wrap"><table id="stockTable"></table></div>
       <div id="pager-stock"></div>
+    </div>
+    <div class="card">
+      <h2>⚠️ 库存提醒</h2>
+      <div class="hint" style="margin-bottom:10px">在库不到 2 个、已经卖完的商品都列在这里，好及时补货。</div>
+      <div class="table-wrap"><table id="alertTable"></table></div>
     </div>
   </section>
 
