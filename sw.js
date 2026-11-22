@@ -1,4 +1,4 @@
-const CACHE_NAME = "qipei-v29";
+const CACHE_NAME = "qipei-v30";
 const ASSETS = [
   "./",
   "./index.html",
