@@ -249,7 +249,7 @@
 <div class="header">
   <div>
     <h1>🚚 嘉诺汽配 · 进销货记录</h1>
-    <div class="sub">卖多少记多少，库存自动算｜数据存本机，建议定期导出备份<span id="verTag" style="opacity:.55"> · v32</span> <span id="updTag" title="点一下检查有没有新版本" onclick="forceUpdate()" style="opacity:.7;cursor:pointer;text-decoration:underline">点此更新</span></div>
+    <div class="sub">卖多少记多少，库存自动算｜数据存本机，建议定期导出备份<span id="verTag" style="opacity:.55"> · v33</span> <span id="updTag" title="点一下检查有没有新版本" onclick="forceUpdate()" style="opacity:.7;cursor:pointer;text-decoration:underline">点此更新</span></div>
   </div>
   <div class="header-actions">
     <button class="btn btn-outline" id="fsBtn" onclick="toggleFullscreen()" style="display:none">⛶ 全屏</button>
@@ -431,6 +431,7 @@
         <button class="btn btn-primary btn-sm" id="btn-sync-push" onclick="cloudPush()">⬆️ 上传到云端</button>
         <button class="btn btn-success btn-sm" id="btn-sync-pull" onclick="cloudPull()">⬇️ 从云端下载</button>
         <button class="btn btn-outline btn-sm" onclick="cloudCheck()">🔎 看看云端有啥</button>
+        <button class="btn btn-outline btn-sm" onclick="cloudDiag()">🔧 网络测一测</button>
       </div>
       <div id="sync-info" class="hint" style="margin-top:10px"></div>
       <div class="hint" style="margin-top:10px">⚠️ 同步码就是钥匙，谁能拿到就能看/改云端备份，请别告诉别人。云端只是中转备份，重要数据还是建议定期用「导出备份」存一份到本机。</div>
@@ -1867,12 +1868,83 @@ function syncReq(method, url, body, onDone) {
   }
 }
 function syncFail(title, msg) {
-  showInfoModal(title, msg + "<br><br>如果一直不行：先把本机数据用「导出备份」存一份，再把手机连一下 Wi-Fi 或换个网络试试。");
+  showInfoModal(title, msg + "<br><br>如果一直不行：先把本机数据用「导出备份」存一份，再把手机连一下 Wi-Fi 或换个网络试试。<br>也可以点下面的「🔧 网络测一测」看看卡在哪一步。");
+}
+/* 备用通道1：JSONP——用 <script> 标签取数据，不受跨域限制，手机 APP 的本机页面也能用 */
+function syncJSONP(url, onDone) {
+  const cbName = "syncCb" + Date.now() + Math.floor(Math.random() * 100000);
+  const full = url + (url.indexOf("?") >= 0 ? "&" : "?") + "callback=" + cbName;
+  let done = false;
+  const s = document.createElement("script");
+  const cleanup = () => { clearTimeout(to); try { delete window[cbName]; } catch (e) { window[cbName] = undefined; } if (s.parentNode) s.parentNode.removeChild(s); };
+  const finish = (o, err) => { if (done) return; done = true; cleanup(); onDone(o, err); };
+  const to = setTimeout(() => finish(null, "备用通道超时"), 20000);
+  window[cbName] = o => finish(o, null);
+  s.onerror = () => finish(null, "备用通道没连上服务器");
+  s.src = full;
+  document.head.appendChild(s);
+}
+/* 备用通道2（上传）：表单 POST 到隐藏 iframe——表单提交不受跨域限制，传完再读一次验证 */
+function syncFormPost(url, body, cb) {
+  const f = document.createElement("form");
+  f.method = "POST"; f.action = url; f.target = "sync-upload-frame"; f.style.display = "none";
+  const inp = document.createElement("input"); inp.type = "hidden"; inp.name = "data"; inp.value = body;
+  f.appendChild(inp);
+  const iframe = document.createElement("iframe"); iframe.name = "sync-upload-frame"; iframe.style.display = "none";
+  document.body.appendChild(iframe); document.body.appendChild(f);
+  let done = false;
+  const cleanup = () => { try { document.body.removeChild(f); } catch (e) {} try { document.body.removeChild(iframe); } catch (e) {} };
+  iframe.onload = () => { if (!done) { done = true; setTimeout(() => { cleanup(); cb(true); }, 300); } };
+  setTimeout(() => { if (!done) { done = true; cleanup(); cb(false); } }, 30000);
+  f.submit();
+}
+/* 统一入口：先走 XHR，不行自动换备用通道；cb(o, err, via) */
+function syncGet(url, cb) {
+  syncReq("GET", url, null, (o, err) => {
+    if (o) return cb(o, null, "xhr");
+    syncJSONP(url, (o2, err2) => {
+      if (o2) return cb(o2, null, "jsonp");
+      cb(null, (err || "网络请求失败") + (err2 ? "；备用通道：" + err2 : ""), "none");
+    });
+  });
+}
+function syncPost(url, body, cb) {
+  syncReq("POST", url, body, (o, err) => {
+    if (o) return cb(o, null, "xhr");
+    syncFormPost(url, body, ok2 => {
+      if (!ok2) return cb(null, (err || "上传请求失败") + "；备用通道也没传上去", "none");
+      syncJSONP(url, (o3, err3) => {
+        if (o3 && o3.ok) return cb(o3, null, "form+jsonp");
+        cb(null, "备用通道传了但没能确认结果" + (err3 ? "（" + err3 + "）" : ""), "none");
+      });
+    });
+  });
+}
+/* 🔧 网络测一测：把三条通道各试一遍，报告卡在哪一步 */
+function cloudDiag() {
+  const url = "https://jianuo-qipei-sync.app.workbuddy.host/health" + SYNC_SHARE;
+  const r = { proto: String(location.protocol || "?"), xhr: "…检测中", fetch: "…检测中", jsonp: "…检测中" };
+  const ua = String(navigator.userAgent || "");
+  const render = () => showInfoModal("🔧 网络检测结果",
+    "页面加载方式：" + (r.proto === "file:" ? "本机（手机APP）" : r.proto) + "<br>" +
+    "通道① XHR：" + r.xhr + "<br>" +
+    "通道② fetch：" + r.fetch + "<br>" +
+    "通道③ JSONP：" + r.jsonp + "<br><br>" +
+    "三条都 ✗ = 手机网络连不上同步服务器，请换 Wi-Fi/流量再试；" +
+    "只有①✗ = APP请求方式被拦，同步功能会自动改走备用通道，不影响使用。<br><br>" +
+    "把这个页面截图发给我就能继续排查。<br><span style='opacity:.45;font-size:11px'>" + esc(ua.slice(0, 150)) + "</span>");
+  render();
+  syncReq("GET", url, null, (o, e) => { r.xhr = o && o.ok ? "✅ 通" : "✗ " + (e || "失败"); render(); });
+  try {
+    fetch(url).then(x => x.json()).then(o => { r.fetch = o && o.ok ? "✅ 通" : "✗ 返回异常"; render(); })
+      .catch(e => { r.fetch = "✗ " + (e && e.message || "失败"); render(); });
+  } catch (e) { r.fetch = "✗ " + (e && e.message || "不支持"); render(); }
+  syncJSONP(url, (o, e) => { r.jsonp = o && o.ok ? "✅ 通" : "✗ " + (e || "失败"); render(); });
 }
 function cloudPush() {
   const url = syncUrl(); if (!url) return;
   syncBusy(true); toast("正在上传到云端…");
-  syncReq("POST", url, JSON.stringify(db), (o, err) => {
+  syncPost(url, JSON.stringify(db), (o, err) => {
     syncBusy(false);
     if (err) { syncFail("上传失败", esc(err)); return; }
     if (!o.ok) { syncFail("上传失败", esc(o.error || "上传失败")); return; }
@@ -1884,7 +1956,7 @@ function cloudPush() {
 function cloudCheck() {
   const url = syncUrl(); if (!url) return;
   syncBusy(true); toast("正在查看云端…");
-  syncReq("GET", url, null, (o, err) => {
+  syncGet(url, (o, err) => {
     syncBusy(false);
     if (err) { syncFail("查看失败", esc(err)); return; }
     if (!o.ok) {
@@ -1900,7 +1972,7 @@ function cloudCheck() {
 function cloudPull() {
   const url = syncUrl(); if (!url) return;
   syncBusy(true); toast("正在从云端下载…");
-  syncReq("GET", url, null, (o, err) => {
+  syncGet(url, (o, err) => {
     syncBusy(false);
     if (err) { syncFail("下载失败", esc(err)); return; }
     if (!o.ok) {
