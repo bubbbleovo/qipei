@@ -249,7 +249,7 @@
 <div class="header">
   <div>
     <h1>🚚 嘉诺汽配 · 进销货记录</h1>
-    <div class="sub">卖多少记多少，库存自动算｜数据存本机，建议定期导出备份<span id="verTag" style="opacity:.55"> · v31</span> <span id="updTag" title="点一下检查有没有新版本" onclick="forceUpdate()" style="opacity:.7;cursor:pointer;text-decoration:underline">点此更新</span></div>
+    <div class="sub">卖多少记多少，库存自动算｜数据存本机，建议定期导出备份<span id="verTag" style="opacity:.55"> · v32</span> <span id="updTag" title="点一下检查有没有新版本" onclick="forceUpdate()" style="opacity:.7;cursor:pointer;text-decoration:underline">点此更新</span></div>
   </div>
   <div class="header-actions">
     <button class="btn btn-outline" id="fsBtn" onclick="toggleFullscreen()" style="display:none">⛶ 全屏</button>
@@ -1839,27 +1839,54 @@ function syncUrl() {
 function syncBusy(on) {
   ["btn-sync-push", "btn-sync-pull"].forEach(id => { const b = document.getElementById(id); if (b) b.disabled = on; });
 }
-async function cloudPush() {
+/* 同步网络层（v32）：用 XMLHttpRequest 而不是 fetch——
+ * 手机APP 的页面是从本机文件（file://）加载的，安卓 WebView 里 fetch 在 file:// 页面经常直接失败，
+ * XHR 配合 APP 已开的跨文件访问权限是稳定可用的；网页版靠服务器的 CORS 头也一样能用。 */
+function syncReq(method, url, body, onDone) {
+  let x;
+  try { x = new XMLHttpRequest(); } catch (e) { onDone(null, "发送请求失败：" + (e && e.message || e)); return; }
+  let done = false;
+  const finish = (o, err) => { if (done) return; done = true; onDone(o, err); };
+  x.open(method, url, true);
+  try { x.timeout = 25000; } catch (e) {}
+  x.onreadystatechange = () => {
+    if (x.readyState !== 4) return;
+    if (x.status === 0) { finish(null, "手机连不上同步服务器：请检查手机能不能上网（能用微信/网页就是网络没问题，稍等几分钟再试一次）"); return; }
+    let o = null;
+    try { o = JSON.parse(x.responseText); } catch (e) {}
+    if (!o) { finish(null, "服务返回异常（HTTP " + x.status + "），稍后再试"); return; }
+    finish(o, null);
+  };
+  x.ontimeout = () => finish(null, "连接超时，网络有点慢，稍后再试一次");
+  x.onerror = () => finish(null, "手机连不上同步服务器：请检查手机能不能上网");
+  if (body != null) {
+    try { x.setRequestHeader("Content-Type", "text/plain;charset=UTF-8"); } catch (e) {}
+    x.send(body);
+  } else {
+    x.send();
+  }
+}
+function syncFail(title, msg) {
+  showInfoModal(title, msg + "<br><br>如果一直不行：先把本机数据用「导出备份」存一份，再把手机连一下 Wi-Fi 或换个网络试试。");
+}
+function cloudPush() {
   const url = syncUrl(); if (!url) return;
   syncBusy(true); toast("正在上传到云端…");
-  try {
-    const r = await fetch(url, { method: "POST", headers: { "Content-Type": "text/plain" }, body: JSON.stringify(db) });
-    const o = await r.json();
-    if (!o.ok) throw new Error(o.error || "上传失败");
+  syncReq("POST", url, JSON.stringify(db), (o, err) => {
+    syncBusy(false);
+    if (err) { syncFail("上传失败", esc(err)); return; }
+    if (!o.ok) { syncFail("上传失败", esc(o.error || "上传失败")); return; }
     const st = syncState(); st.push = o.updatedAt; localStorage.setItem(SYNC_STATE_KEY, JSON.stringify(st));
     renderSync();
     showInfoModal("✅ 上传成功", "本机数据已经备份到云端（" + fmtIso(o.updatedAt) + "）。<br><br>在另一台设备上打开本系统 → 填同一个同步码 → 点「从云端下载」就过来了。");
-  } catch (e) {
-    showInfoModal("上传失败", "没传上去：网络不通或服务忙。<br><br>请确认手机/电脑能上网，稍等一下再点一次。<br><br><span style='opacity:.6'>" + esc(String(e.message || e)) + "</span>");
-  }
-  syncBusy(false);
+  });
 }
-async function cloudCheck() {
+function cloudCheck() {
   const url = syncUrl(); if (!url) return;
   syncBusy(true); toast("正在查看云端…");
-  try {
-    const r = await fetch(url);
-    const o = await r.json();
+  syncReq("GET", url, null, (o, err) => {
+    syncBusy(false);
+    if (err) { syncFail("查看失败", esc(err)); return; }
     if (!o.ok) {
       showInfoModal("云端没有备份", "这个同步码在云端还没有备份。<br><br>先用「上传到云端」存一份上去。");
     } else {
@@ -1868,27 +1895,26 @@ async function cloudCheck() {
       const nCust = Array.isArray(d.customers) ? d.customers.length : 0;
       showInfoModal("云端有备份", "备份时间：" + fmtIso(o.updatedAt) + "<br>进货批次：" + nRec + " 条<br>客户：" + nCust + " 位<br><br>要把它拿下来，点「从云端下载」。");
     }
-  } catch (e) {
-    showInfoModal("查看失败", "网络不通或服务忙，稍后再试。<br><br><span style='opacity:.6'>" + esc(String(e.message || e)) + "</span>");
-  }
-  syncBusy(false);
+  });
 }
-async function cloudPull() {
+function cloudPull() {
   const url = syncUrl(); if (!url) return;
   syncBusy(true); toast("正在从云端下载…");
-  try {
-    const r = await fetch(url);
-    const o = await r.json();
-    if (!o.ok) throw new Error(o.error || "云端还没有备份");
-    if (!o.data || !Array.isArray(o.data.records)) throw new Error("云端数据不是本系统的备份");
+  syncReq("GET", url, null, (o, err) => {
+    syncBusy(false);
+    if (err) { syncFail("下载失败", esc(err)); return; }
+    if (!o.ok) {
+      syncFail("下载失败", String(o.error || "").indexOf("还没有") >= 0
+        ? "这个同步码在云端还没有备份，先用「上传到云端」存一份。"
+        : esc(o.error || "下载失败"));
+      return;
+    }
+    if (!o.data || !Array.isArray(o.data.records)) { syncFail("下载失败", "云端数据不是本系统的备份，同步码可能填错了"); return; }
     const d = o.data;
     const nRec = d.records.length, nCust = (d.customers || []).length;
     showInfoModal("确认替换", "云端备份时间：" + fmtIso(o.updatedAt) + "<br>进货批次：" + nRec + " 条｜客户：" + nCust + " 位<br><br><b style='color:#dc2626'>要用云端数据替换本机数据吗？本机现在的记录会被覆盖。</b>",
       { okText: "确定，用云端的", cancelText: "算了，不动了", onOk: () => doCloudPull(d) });
-  } catch (e) {
-    showInfoModal("下载失败", (String(e.message || e).indexOf("云端还没有") === 0 ? "这个同步码在云端还没有备份，先用「上传到云端」存一份。" : "网络不通或服务忙，稍后再试。") + "<br><br><span style='opacity:.6'>" + esc(String(e.message || e)) + "</span>");
-  }
-  syncBusy(false);
+  });
 }
 function doCloudPull(data) {
   db = data;
