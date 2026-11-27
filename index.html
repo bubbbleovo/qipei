@@ -249,7 +249,7 @@
 <div class="header">
   <div>
     <h1>🚚 嘉诺汽配 · 进销货记录</h1>
-    <div class="sub">卖多少记多少，库存自动算｜数据存本机，建议定期导出备份<span id="verTag" style="opacity:.55"> · v30</span> <span id="updTag" title="点一下检查有没有新版本" onclick="forceUpdate()" style="opacity:.7;cursor:pointer;text-decoration:underline">点此更新</span></div>
+    <div class="sub">卖多少记多少，库存自动算｜数据存本机，建议定期导出备份<span id="verTag" style="opacity:.55"> · v31</span> <span id="updTag" title="点一下检查有没有新版本" onclick="forceUpdate()" style="opacity:.7;cursor:pointer;text-decoration:underline">点此更新</span></div>
   </div>
   <div class="header-actions">
     <button class="btn btn-outline" id="fsBtn" onclick="toggleFullscreen()" style="display:none">⛶ 全屏</button>
@@ -265,6 +265,7 @@
   <button data-tab="sales" onclick="switchTab('sales')">🧾 销货记录</button>
   <button data-tab="customers" onclick="switchTab('customers')">👥 客户记录</button>
   <button data-tab="dash" onclick="switchTab('dash')">📊 经营汇总</button>
+  <button data-tab="sync" onclick="switchTab('sync')">☁️ 同步</button>
 </div>
 
 <div class="container">
@@ -417,6 +418,22 @@
       <h2>💰 各商品经营情况</h2>
       <div class="table-wrap"><table id="productTable"></table></div>
       <div id="pager-prod"></div>
+    </div>
+  </section>
+
+  <!-- 数据同步 -->
+  <section id="tab-sync" style="display:none">
+    <div class="card">
+      <h2>☁️ 手机电脑数据同步</h2>
+      <div class="hint" style="margin-bottom:10px">先设一个同步码（自己起名，如 jianuo2026，别太简单）。手机和电脑都填<b>一模一样</b>的码：一边点「上传到云端」，另一边点「从云端下载」，数据就过去了。</div>
+      <div class="form-row"><label>同步码</label><input type="text" id="sync-code" autocomplete="off" placeholder="自己起一个码，如 jianuo2026" oninput="saveSyncCode()"></div>
+      <div class="toolbar">
+        <button class="btn btn-primary btn-sm" id="btn-sync-push" onclick="cloudPush()">⬆️ 上传到云端</button>
+        <button class="btn btn-success btn-sm" id="btn-sync-pull" onclick="cloudPull()">⬇️ 从云端下载</button>
+        <button class="btn btn-outline btn-sm" onclick="cloudCheck()">🔎 看看云端有啥</button>
+      </div>
+      <div id="sync-info" class="hint" style="margin-top:10px"></div>
+      <div class="hint" style="margin-top:10px">⚠️ 同步码就是钥匙，谁能拿到就能看/改云端备份，请别告诉别人。云端只是中转备份，重要数据还是建议定期用「导出备份」存一份到本机。</div>
     </div>
   </section>
 </div>
@@ -1159,7 +1176,7 @@ function exportSalesCsv() {
 /* ================= 标签页 ================= */
 function switchTab(tab) {
   document.querySelectorAll(".nav button").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
-  ["records", "stock", "sales", "customers", "dash"].forEach(t => { document.getElementById("tab-" + t).style.display = (t === tab) ? "" : "none"; });
+  ["records", "stock", "sales", "customers", "dash", "sync"].forEach(t => { document.getElementById("tab-" + t).style.display = (t === tab) ? "" : "none"; });
   renderAll();
 }
 
@@ -1781,7 +1798,105 @@ function renderMonthly() {
     : `<tbody><tr><td colspan="11"><div class="empty-tip">还没有卖出记录，卖货之后这里会按月统计利润</div></td></tr></tbody>`;
 }
 
-function renderAll() { renderRecords(); renderStock(); renderSales(); renderCustomers(); renderDash(); renderMonthly(); renderCustSales(); }
+function renderAll() { renderRecords(); renderStock(); renderSales(); renderCustomers(); renderDash(); renderMonthly(); renderCustSales(); renderSync(); }
+
+/* ================= 云同步（v31） ================= */
+const SYNC_API = "https://jianuo-qipei-sync.app.workbuddy.host/sync";
+const SYNC_CODE_KEY = "jnqipei_sync_code";
+const SYNC_STATE_KEY = "jnqipei_sync_state";
+const SYNC_SHARE = "?sharecode=URQ2JDM67A";
+const SYNC_CODE_RE = /^[A-Za-z0-9_-]{4,40}$/;
+
+function saveSyncCode() { localStorage.setItem(SYNC_CODE_KEY, val("sync-code")); }
+function syncCode() { return (localStorage.getItem(SYNC_CODE_KEY) || "").trim(); }
+function syncState() { try { return JSON.parse(localStorage.getItem(SYNC_STATE_KEY) || "{}") || {}; } catch (e) { return {}; } }
+function fmtIso(s) {
+  if (!s) return "";
+  const d = new Date(s);
+  if (isNaN(d)) return s;
+  const p = n => String(n).padStart(2, "0");
+  return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()) + " " + p(d.getHours()) + ":" + p(d.getMinutes());
+}
+function renderSync() {
+  const el = document.getElementById("sync-info");
+  if (!el) return;
+  const input = document.getElementById("sync-code");
+  if (input && input.value !== syncCode()) input.value = syncCode();
+  const st = syncState();
+  const lines = [];
+  if (st.push) lines.push("上次上传：⬆️ " + fmtIso(st.push));
+  if (st.pull) lines.push("上次下载：⬇️ " + fmtIso(st.pull));
+  el.innerHTML = lines.length ? lines.join("<br>") : "还没用过同步。第一次用：先填同步码 → 点「上传到云端」把现在的数据存上去。";
+}
+function syncUrl() {
+  const c = syncCode();
+  if (!SYNC_CODE_RE.test(c)) {
+    showInfoModal("先填同步码", "同步码至少 4 个字，只能用字母、数字、短横线或下划线。<br><br>手机和电脑要填<b>一模一样</b>的码，数据才能对上。");
+    return null;
+  }
+  return SYNC_API + "/" + encodeURIComponent(c) + SYNC_SHARE;
+}
+function syncBusy(on) {
+  ["btn-sync-push", "btn-sync-pull"].forEach(id => { const b = document.getElementById(id); if (b) b.disabled = on; });
+}
+async function cloudPush() {
+  const url = syncUrl(); if (!url) return;
+  syncBusy(true); toast("正在上传到云端…");
+  try {
+    const r = await fetch(url, { method: "POST", headers: { "Content-Type": "text/plain" }, body: JSON.stringify(db) });
+    const o = await r.json();
+    if (!o.ok) throw new Error(o.error || "上传失败");
+    const st = syncState(); st.push = o.updatedAt; localStorage.setItem(SYNC_STATE_KEY, JSON.stringify(st));
+    renderSync();
+    showInfoModal("✅ 上传成功", "本机数据已经备份到云端（" + fmtIso(o.updatedAt) + "）。<br><br>在另一台设备上打开本系统 → 填同一个同步码 → 点「从云端下载」就过来了。");
+  } catch (e) {
+    showInfoModal("上传失败", "没传上去：网络不通或服务忙。<br><br>请确认手机/电脑能上网，稍等一下再点一次。<br><br><span style='opacity:.6'>" + esc(String(e.message || e)) + "</span>");
+  }
+  syncBusy(false);
+}
+async function cloudCheck() {
+  const url = syncUrl(); if (!url) return;
+  syncBusy(true); toast("正在查看云端…");
+  try {
+    const r = await fetch(url);
+    const o = await r.json();
+    if (!o.ok) {
+      showInfoModal("云端没有备份", "这个同步码在云端还没有备份。<br><br>先用「上传到云端」存一份上去。");
+    } else {
+      const d = o.data || {};
+      const nRec = Array.isArray(d.records) ? d.records.length : 0;
+      const nCust = Array.isArray(d.customers) ? d.customers.length : 0;
+      showInfoModal("云端有备份", "备份时间：" + fmtIso(o.updatedAt) + "<br>进货批次：" + nRec + " 条<br>客户：" + nCust + " 位<br><br>要把它拿下来，点「从云端下载」。");
+    }
+  } catch (e) {
+    showInfoModal("查看失败", "网络不通或服务忙，稍后再试。<br><br><span style='opacity:.6'>" + esc(String(e.message || e)) + "</span>");
+  }
+  syncBusy(false);
+}
+async function cloudPull() {
+  const url = syncUrl(); if (!url) return;
+  syncBusy(true); toast("正在从云端下载…");
+  try {
+    const r = await fetch(url);
+    const o = await r.json();
+    if (!o.ok) throw new Error(o.error || "云端还没有备份");
+    if (!o.data || !Array.isArray(o.data.records)) throw new Error("云端数据不是本系统的备份");
+    const d = o.data;
+    const nRec = d.records.length, nCust = (d.customers || []).length;
+    showInfoModal("确认替换", "云端备份时间：" + fmtIso(o.updatedAt) + "<br>进货批次：" + nRec + " 条｜客户：" + nCust + " 位<br><br><b style='color:#dc2626'>要用云端数据替换本机数据吗？本机现在的记录会被覆盖。</b>",
+      { okText: "确定，用云端的", cancelText: "算了，不动了", onOk: () => doCloudPull(d) });
+  } catch (e) {
+    showInfoModal("下载失败", (String(e.message || e).indexOf("云端还没有") === 0 ? "这个同步码在云端还没有备份，先用「上传到云端」存一份。" : "网络不通或服务忙，稍后再试。") + "<br><br><span style='opacity:.6'>" + esc(String(e.message || e)) + "</span>");
+  }
+  syncBusy(false);
+}
+function doCloudPull(data) {
+  db = data;
+  save();
+  const st = syncState(); st.pull = new Date().toISOString(); localStorage.setItem(SYNC_STATE_KEY, JSON.stringify(st));
+  switchTab("sync");
+  showInfoModal("✅ 同步完成", "云端数据已经下载下来，本机数据全部替换成了云端那份。");
+}
 
 /* ================= 弹窗基础 ================= */
 let modalHandler = null;
