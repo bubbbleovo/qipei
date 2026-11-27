@@ -249,7 +249,7 @@
 <div class="header">
   <div>
     <h1>🚚 嘉诺汽配 · 进销货记录</h1>
-    <div class="sub">卖多少记多少，库存自动算｜数据存本机，建议定期导出备份<span id="verTag" style="opacity:.55"> · v33</span> <span id="updTag" title="点一下检查有没有新版本" onclick="forceUpdate()" style="opacity:.7;cursor:pointer;text-decoration:underline">点此更新</span></div>
+    <div class="sub">卖多少记多少，库存自动算｜数据存本机，建议定期导出备份<span id="verTag" style="opacity:.55"> · v34</span> <span id="updTag" title="点一下检查有没有新版本" onclick="forceUpdate()" style="opacity:.7;cursor:pointer;text-decoration:underline">点此更新</span></div>
   </div>
   <div class="header-actions">
     <button class="btn btn-outline" id="fsBtn" onclick="toggleFullscreen()" style="display:none">⛶ 全屏</button>
@@ -491,6 +491,12 @@ const KEY = "jnqipei_v3";
 const V2_KEY = "jnqipei_v2";
 const OLD_KEY = "autoPartsStore_v1";
 let db = load();
+
+/* APP 应用内更新模式：旧 APK 里本机存的数据通过原生桥搬到线上版（搬完由原生端切换到线上页面） */
+if (window.AndroidBridge && !localStorage.getItem("jnqipei_inapp")) {
+  localStorage.setItem("jnqipei_inapp", "1");
+  try { AndroidBridge.migrate(localStorage.getItem(KEY) || ""); } catch (e) { }
+}
 
 function blankDB() { return { records: [], customers: [], seq: 1, orderSeq: 1 }; }
 
