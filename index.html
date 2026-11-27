@@ -249,7 +249,7 @@
 <div class="header">
   <div>
     <h1>🚚 嘉诺汽配 · 进销货记录</h1>
-    <div class="sub">卖多少记多少，库存自动算｜数据存本机，建议定期导出备份<span id="verTag" style="opacity:.55"> · v34</span> <span id="updTag" title="点一下检查有没有新版本" onclick="forceUpdate()" style="opacity:.7;cursor:pointer;text-decoration:underline">点此更新</span></div>
+    <div class="sub">卖多少记多少，库存自动算｜数据存本机，建议定期导出备份<span id="verTag" style="opacity:.55"> · v35</span> <span id="updTag" title="点一下检查有没有新版本" onclick="forceUpdate()" style="opacity:.7;cursor:pointer;text-decoration:underline">点此更新</span></div>
   </div>
   <div class="header-actions">
     <button class="btn btn-outline" id="fsBtn" onclick="toggleFullscreen()" style="display:none">⛶ 全屏</button>
@@ -427,6 +427,10 @@
       <h2>☁️ 手机电脑数据同步</h2>
       <div class="hint" style="margin-bottom:10px">先设一个同步码（自己起名，如 jianuo2026，别太简单）。手机和电脑都填<b>一模一样</b>的码：一边点「上传到云端」，另一边点「从云端下载」，数据就过去了。</div>
       <div class="form-row"><label>同步码</label><input type="text" id="sync-code" autocomplete="off" placeholder="自己起一个码，如 jianuo2026" oninput="saveSyncCode()"></div>
+      <div class="toolbar" style="margin-bottom:10px">
+        <button class="btn btn-lg" id="btn-auto" style="width:100%;background:#059669;color:#fff" onclick="toggleAuto()">🔄 开启自动同步（推荐）</button>
+      </div>
+      <div class="hint" style="margin-bottom:10px">💡 开启后：改完账自动上传，打开 APP/网页自动检查云端有没有新记录。两边都改过会自动合并，互不覆盖。不用再手动点上传下载。</div>
       <div class="toolbar">
         <button class="btn btn-primary btn-sm" id="btn-sync-push" onclick="cloudPush()">⬆️ 上传到云端</button>
         <button class="btn btn-success btn-sm" id="btn-sync-pull" onclick="cloudPull()">⬇️ 从云端下载</button>
@@ -618,7 +622,22 @@ function load() {
   localStorage.setItem(KEY, JSON.stringify(data));
   return data;
 }
-function save() { localStorage.setItem(KEY, JSON.stringify(db)); }
+function save() {
+  localStorage.setItem(KEY, JSON.stringify(db));
+  if (!autoSkip) markAutoDirty();
+  autoSkip = false;
+}
+/* 自动同步状态（v35）：本机有改动时打标，稍后自动上传 */
+let autoSkip = false;            // 内部改库（如同步下载）时跳过打标，避免来回传
+let autoDirty = false;           // 本机有新改动还没传
+let autoPushTimer = null;
+let autoBusy = false;
+function markAutoDirty() {
+  if (!autoOn()) return;
+  autoDirty = true;
+  clearTimeout(autoPushTimer);
+  autoPushTimer = setTimeout(() => autoPush(true), 1500);   // 停止操作 1.5 秒后自动传
+}
 function nextId() { return db.seq++; }
 function today() { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
 function money(n) { return "¥" + (Number(n) || 0).toFixed(2); }
@@ -1811,8 +1830,13 @@ function renderAll() { renderRecords(); renderStock(); renderSales(); renderCust
 const SYNC_API = "https://jianuo-qipei-sync.app.workbuddy.host/sync";
 const SYNC_CODE_KEY = "jnqipei_sync_code";
 const SYNC_STATE_KEY = "jnqipei_sync_state";
+const AUTO_KEY = "jnqipei_auto";              // 自动同步开关
+const AUTO_REV_KEY = "jnqipei_auto_rev";      // 云端版本号（用来判断云端有没有新数据）
 const SYNC_SHARE = "?sharecode=URQ2JDM67A";
 const SYNC_CODE_RE = /^[A-Za-z0-9_-]{4,40}$/;
+function autoOn() { return localStorage.getItem(AUTO_KEY) === "1"; }
+function autoRev() { return localStorage.getItem(AUTO_REV_KEY) || ""; }
+function setAutoRev(v) { if (v) localStorage.setItem(AUTO_REV_KEY, String(v)); }
 
 function saveSyncCode() { localStorage.setItem(SYNC_CODE_KEY, val("sync-code")); }
 function syncCode() { return (localStorage.getItem(SYNC_CODE_KEY) || "").trim(); }
@@ -1829,11 +1853,20 @@ function renderSync() {
   if (!el) return;
   const input = document.getElementById("sync-code");
   if (input && input.value !== syncCode()) input.value = syncCode();
+  const btn = document.getElementById("btn-auto");
+  if (btn) btn.textContent = autoOn() ? "✅ 自动同步已开启（点此关闭）" : "🔄 开启自动同步（推荐）";
   const st = syncState();
   const lines = [];
+  if (autoOn()) {
+    lines.push("🔄 自动同步：<b style='color:#059669'>已开启</b>（改完自动上传，打开自动检查云端）");
+    if (autoDirty) lines.push("⏳ 本机有新改动，正在自动上传…");
+    if (autoRev()) lines.push("已同步到云端版本：" + fmtIso(autoRev()));
+  } else {
+    lines.push("自动同步：未开启（点上面按钮打开，就不用手动点了）");
+  }
   if (st.push) lines.push("上次上传：⬆️ " + fmtIso(st.push));
   if (st.pull) lines.push("上次下载：⬇️ " + fmtIso(st.pull));
-  el.innerHTML = lines.length ? lines.join("<br>") : "还没用过同步。第一次用：先填同步码 → 点「上传到云端」把现在的数据存上去。";
+  el.innerHTML = lines.join("<br>");
 }
 function syncUrl() {
   const c = syncCode();
@@ -1955,6 +1988,7 @@ function cloudPush() {
     if (err) { syncFail("上传失败", esc(err)); return; }
     if (!o.ok) { syncFail("上传失败", esc(o.error || "上传失败")); return; }
     const st = syncState(); st.push = o.updatedAt; localStorage.setItem(SYNC_STATE_KEY, JSON.stringify(st));
+    setAutoRev(o.updatedAt);
     renderSync();
     showInfoModal("✅ 上传成功", "本机数据已经备份到云端（" + fmtIso(o.updatedAt) + "）。<br><br>在另一台设备上打开本系统 → 填同一个同步码 → 点「从云端下载」就过来了。");
   });
@@ -1991,16 +2025,113 @@ function cloudPull() {
     const d = o.data;
     const nRec = d.records.length, nCust = (d.customers || []).length;
     showInfoModal("确认替换", "云端备份时间：" + fmtIso(o.updatedAt) + "<br>进货批次：" + nRec + " 条｜客户：" + nCust + " 位<br><br><b style='color:#dc2626'>要用云端数据替换本机数据吗？本机现在的记录会被覆盖。</b>",
-      { okText: "确定，用云端的", cancelText: "算了，不动了", onOk: () => doCloudPull(d) });
+      { okText: "确定，用云端的", cancelText: "算了，不动了", onOk: () => doCloudPull(d, o.updatedAt) });
   });
 }
-function doCloudPull(data) {
+function doCloudPull(data, rev) {
+  autoSkip = true;
   db = data;
   save();
+  setAutoRev(rev || new Date().toISOString());
   const st = syncState(); st.pull = new Date().toISOString(); localStorage.setItem(SYNC_STATE_KEY, JSON.stringify(st));
+  autoDirty = false;
   switchTab("sync");
   showInfoModal("✅ 同步完成", "云端数据已经下载下来，本机数据全部替换成了云端那份。");
 }
+
+/* ================= 自动同步（v35） ================= */
+/* 规则：① 本机改了数据 → 1.5 秒后自动上传
+        ② 打开页面 / 切回 APP / 每 60 秒 → 自动检查云端版本号，有新的就下载
+        ③ 两边都改过 → 按记录 ID 合并（各自新增的记录都保留），再传上去 */
+function toggleAuto() {
+  if (!autoOn()) {
+    if (!SYNC_CODE_RE.test(syncCode())) {
+      showInfoModal("先填同步码", "开启自动同步前，请先填一个同步码（至少 4 位，字母/数字）。<br>手机和电脑填一模一样的码。");
+      return;
+    }
+    localStorage.setItem(AUTO_KEY, "1");
+    showInfoModal("✅ 自动同步已开启", "以后这样工作：<br>① 你在这台设备记账 → 停手 1.5 秒后自动上传云端<br>② 打开页面 / 切回 APP → 自动检查云端有没有别处的新记录，有就自动取下来<br>③ 两边都改过 → 自动合并，各自新增的记录都保留<br><br>不用再点上传/下载按钮了。");
+    autoCheck(true);   // 开启时立刻对齐一次
+  } else {
+    localStorage.removeItem(AUTO_KEY);
+    showInfoModal("自动同步已关闭", "以后改数据不会再自动上传，需要手动点上传/下载按钮。");
+  }
+  renderSync();
+}
+function autoPush(silent) {
+  if (!autoOn() || autoBusy) return;
+  const url = syncUrl(); if (!url) return;
+  autoBusy = true; autoDirty = false; renderSync();
+  if (!silent) toast("正在自动上传…");
+  syncPost(url, JSON.stringify(db), (o, err) => {
+    autoBusy = false;
+    if (err || !o || !o.ok) { autoDirty = true; renderSync(); if (!silent) toast("自动上传没成功，稍后再试"); return; }
+    setAutoRev(o.updatedAt);
+    const st = syncState(); st.push = o.updatedAt; localStorage.setItem(SYNC_STATE_KEY, JSON.stringify(st));
+    renderSync();
+    if (!silent) toast("✅ 已自动上传云端");
+  });
+}
+function mergeDB(local, remote) {
+  const out = { records: [], customers: [], seq: 1, orderSeq: 1 };
+  const idx = {};
+  const add = r => {
+    const k = String(r.id || "");
+    if (!idx[k]) { const c = JSON.parse(JSON.stringify(r)); idx[k] = c; out.records.push(c); return c; }
+    const t = idx[k];
+    // 同批次：保留本地的进价/供应商（最近改的），卖出记录按 ID 合并，并集
+    ["product", "date", "cost", "supplier", "note"].forEach(f => { if (local.records.some(x => String(x.id) === k)) t[f] = r[f]; });
+    const seen = {};
+    (t.sales || []).forEach(s => { seen[String(s.id)] = true; });
+    (r.sales || []).forEach(s => { if (!seen[String(s.id)]) { (t.sales = t.sales || []).push(JSON.parse(JSON.stringify(s))); seen[String(s.id)] = true; } });
+    return t;
+  };
+  (remote.records || []).forEach(add);
+  (local.records || []).forEach(add);
+  const cm = {};
+  (remote.customers || []).concat(local.customers || []).forEach(c => { const n = (c && c.name) || String(c); if (n) cm[n] = c; });
+  out.customers = Object.keys(cm).map(n => cm[n]);
+  out.seq = Math.max(Number(local.seq) || 0, Number(remote.seq) || 0, 1);
+  out.orderSeq = Math.max(Number(local.orderSeq) || 0, Number(remote.orderSeq) || 0, 1);
+  return out;
+}
+function autoCheck(manual) {
+  if (!autoOn() || autoBusy) return;
+  const url = syncUrl(); if (!url) return;
+  autoBusy = true;
+  syncGet(url, (o, err) => {
+    autoBusy = false;
+    if (err || !o) { if (manual) toast("检查云端没成功，稍后再试"); return; }
+    if (!o.ok) {
+      // 云端还没备份：本机有数据就把本机传上去作起点
+      if (Array.isArray(o.data) || (db.records && db.records.length)) autoPush(true);
+      return;
+    }
+    const rev = String(o.updatedAt || "");
+    if (rev && rev === autoRev()) return;   // 云端没新版本
+    if (!o.data || !Array.isArray(o.data.records)) return;
+    const cloud = o.data;
+    const merged = autoDirty;
+    const next = merged ? mergeDB(db, cloud) : cloud;
+    autoSkip = true;
+    db = normalize(next);
+    save();
+    setAutoRev(rev);
+    autoDirty = false;
+    const st = syncState(); st.pull = new Date().toISOString(); localStorage.setItem(SYNC_STATE_KEY, JSON.stringify(st));
+    renderAll(); renderSync();
+    toast(merged ? "🔄 已合并两边的新数据" : "🔄 已自动同步云端新数据");
+  });
+}
+let autoIntroChecked = false;
+function autoStart() {
+  if (!autoOn()) return;
+  if (!autoIntroChecked) { autoIntroChecked = true; autoCheck(true); }
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) autoCheck(false); });
+  window.addEventListener("focus", () => autoCheck(false));
+  setInterval(() => autoCheck(false), 60000);
+}
+setTimeout(autoStart, 1200);
 
 /* ================= 弹窗基础 ================= */
 let modalHandler = null;
